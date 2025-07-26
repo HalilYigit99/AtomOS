@@ -1,6 +1,6 @@
 # AtomOS - Bare Metal İşletim Sistemi
 
-AtomOS, x86_64 mimarisi için geliştirilmiş bare metal bir işletim sistemi projesidir.
+AtomOS, x86 mimarisi için geliştirilmiş bare metal bir işletim sistemi projesidir.
 
 ## Özellikler
 

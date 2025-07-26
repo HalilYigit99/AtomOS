@@ -2,8 +2,8 @@
 # Derleyici ayarları
 CC = x86_64-elf-gcc
 ASM = nasm
-CFLAGS = -ffreestanding -O2 -Wall -Wextra -fno-exceptions -fno-rtti
-ASMFLAGS = -f elf64
+CFLAGS = -ffreestanding -O2 -Wall -Wextra -fno-exceptions -fno-rtti -m32
+ASMFLAGS = -f elf32
 
 # Dizinler
 BUILD_DIR = build

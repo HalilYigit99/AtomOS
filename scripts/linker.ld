@@ -1,4 +1,6 @@
 /* AtomOS Linker Script */
+OUTPUT_FORMAT("elf32-i386")
+OUTPUT_ARCH(i386)
 ENTRY(_start)
 
 SECTIONS
@@ -31,4 +33,13 @@ SECTIONS
         *(COMMON)
         *(.bss)
     }
+
+    .stack (NOLOAD) :
+    {
+        . = ALIGN(4);
+        __stack_start = .;
+        . += 0x100000; /* 1MB stack */
+        __stack_end = .;
+    }
+
 }

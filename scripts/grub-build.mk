@@ -5,7 +5,7 @@ ALL_OBJECTS = $(C_OBJECTS) $(CPP_OBJECTS) $(ASM_OBJECTS)
 
 # Kernel ELF dosyasını oluştur
 kernel.elf: $(ALL_OBJECTS)
-	$(CC) -T $(SCRIPTS_DIR)/linker.ld -o $@ $(ALL_OBJECTS) -ffreestanding -O2 -nostdlib -lgcc
+	ld -m elf_i386 -T $(SCRIPTS_DIR)/linker.ld -o $@ $(ALL_OBJECTS)
 	@echo "Kernel ELF oluşturuldu: $@"
 
 # ISO oluştur
