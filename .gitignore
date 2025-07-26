@@ -1,0 +1,18 @@
+# Build outputs
+/build/
+/std/build/
+/std/stdlib.so
+
+# ISO files
+/AtomOS.iso
+/iso/
+
+# Editor files
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+Thumbs.db
