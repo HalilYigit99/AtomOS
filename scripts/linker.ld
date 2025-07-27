@@ -42,4 +42,8 @@ SECTIONS
         __stack_end = .;
     }
 
+    . = ALIGN(4);
+
+    __kernel_end = .;
+
 }

@@ -29,7 +29,9 @@ typedef struct {
     size_t free;       // Free size in the heap
 } heap_t;
 
-void heap_create(heap_t* heap, void* start, size_t size);
+extern heap_t kernel_heap; // Global kernel heap
+
+void heap_create(heap_t* heap, void* start, void* end);
 void* heap_alloc(heap_t* heap, size_t size);
 void heap_free(heap_t* heap, void* ptr);
 void heap_destroy(heap_t* heap);
