@@ -148,16 +148,31 @@ void heap_free(heap_t* heap, void* ptr) {
         return; // Pointer is outside heap bounds
     }
 
-    // Get the block header
-    heap_block_t* block = (heap_block_t*)((char*)ptr - sizeof(heap_block_t));
-    
-    // Check if block header is within heap bounds
-    if ((void*)block < heap->start || (char*)block + sizeof(heap_block_t) > (char*)heap->end) {
-        return; // Block header is outside heap bounds
+    // Find the correct block that contains this pointer
+    heap_block_t* block = NULL;
+    heap_block_t* current = (heap_block_t*)heap->start;
+
+    while (current && (char*)current < (char*)heap->end) {
+        if (!is_valid_block(current)) {
+            return; // Heap corruption detected
+        }
+
+        if (!current->free) {
+            void* data_start = (char*)current + sizeof(heap_block_t);
+            void* data_end = (char*)current + current->size;
+            
+            // Check if ptr is within this block's data area
+            if (ptr >= data_start && ptr < data_end) {
+                block = current;
+                break;
+            }
+        }
+
+        current = current->next;
     }
     
-    if (!is_valid_block(block) || block->free) {
-        return; // Invalid block or already free
+    if (!block) {
+        return; // Block not found or already free
     }
 
     // Mark block as free
@@ -172,15 +187,15 @@ void heap_free(heap_t* heap, void* ptr) {
     }
 
     // Coalesce with previous block if it's free
-    heap_block_t* current = (heap_block_t*)heap->start;
+    heap_block_t* prev = (heap_block_t*)heap->start;
 
-    while (current && current != block) {
-        if (current->next == block && current->free && is_valid_block(current)) {
-            current->size += block->size;
-            current->next = block->next;
-            break;
-        }
-        current = current->next;
+    while (prev && prev->next && prev->next != block) {
+        prev = prev->next;
+    }
+
+    if (prev && prev->next == block && prev->free && is_valid_block(prev)) {
+        prev->size += block->size;
+        prev->next = block->next;
     }
 }
 
@@ -201,50 +216,168 @@ void* heap_realloc(heap_t* heap, void* ptr, size_t new_size) {
         return NULL;
     }
 
+    // Eğer ptr NULL ise, yeni allocation yap
     if (!ptr) {
         return heap_alloc(heap, new_size);
     }
 
+    // Eğer new_size 0 ise, free yap
     if (new_size == 0) {
         heap_free(heap, ptr);
         return NULL;
     }
     
-    // Check if pointer is within heap bounds
+    // Pointer'ın heap sınırları içinde olup olmadığını kontrol et
     if (ptr < heap->start || ptr >= heap->end) {
-        return NULL; // Pointer is outside heap bounds
+        return NULL;
     }
 
-    // Get the current block
-    heap_block_t* block = (heap_block_t*)((char*)ptr - sizeof(heap_block_t));
+    // Mevcut blok header'ını bul
+    heap_block_t* block = NULL;
     
-    // Check if block header is within heap bounds
-    if ((void*)block < heap->start || (char*)block + sizeof(heap_block_t) > (char*)heap->end) {
-        return NULL; // Block header is outside heap bounds
+    // Önce ptr - sizeof(heap_block_t) adresinin geçerli bir header olup olmadığını kontrol et
+    heap_block_t* potential_block = (heap_block_t*)((char*)ptr - sizeof(heap_block_t));
+    if ((void*)potential_block >= heap->start && 
+        (char*)potential_block + sizeof(heap_block_t) <= (char*)heap->end &&
+        is_valid_block(potential_block) && !potential_block->free) {
+        
+        // Potential block'un data alanının ptr'ı kapsadığını kontrol et
+        void* data_start = (char*)potential_block + sizeof(heap_block_t);
+        void* data_end = (char*)potential_block + potential_block->size;
+        
+        if (ptr >= data_start && ptr < data_end) {
+            block = potential_block;
+        }
     }
     
-    if (!is_valid_block(block) || block->free) {
-        return NULL; // Invalid block
+    // Eğer hızlı yöntemle bulamadıysak, heap'i başından tara
+    if (!block) {
+        heap_block_t* current = (heap_block_t*)heap->start;
+        
+        while (current && (char*)current < (char*)heap->end) {
+            if (!is_valid_block(current)) {
+                return NULL; // Heap corruption
+            }
+            
+            if (!current->free) {
+                void* data_start = (char*)current + sizeof(heap_block_t);
+                void* data_end = (char*)current + current->size;
+                
+                // ptr bu blokun data alanında mı?
+                if (ptr >= data_start && ptr < data_end) {
+                    block = current;
+                    break;
+                }
+            }
+            
+            current = current->next;
+        }
+    }
+    
+    // Blok bulunamadı
+    if (!block) {
+        return NULL;
     }
 
     size_t old_data_size = block->size - sizeof(heap_block_t);
     size_t aligned_new_size = align_size(new_size);
+    size_t required_total_size = aligned_new_size + sizeof(heap_block_t);
 
-    // If new size fits in current block, just return the same pointer
+    // Eğer yeni boyut mevcut blok boyutuna eşit veya küçükse
     if (aligned_new_size <= old_data_size) {
-        return ptr;
+        // Küçültme durumu - bloku böl
+        if (old_data_size - aligned_new_size >= sizeof(heap_block_t) + sizeof(void*)) {
+            // Yeterince büyük fark var, bloku böl
+            heap_block_t* new_free_block = (heap_block_t*)((char*)block + required_total_size);
+            
+            // Yeni free blok heap sınırları içinde mi kontrol et
+            if ((char*)new_free_block + sizeof(heap_block_t) <= (char*)heap->end) {
+                new_free_block->size = block->size - required_total_size;
+                new_free_block->free = true;
+                new_free_block->magic = HEAP_MAGIC;
+                new_free_block->next = block->next;
+                
+                // Orijinal bloku güncelle
+                block->size = required_total_size;
+                block->next = new_free_block;
+                
+                // Free space'i güncelle
+                heap->free += new_free_block->size;
+                
+                // Yeni free bloku bir sonraki free blokla birleştirmeye çalış
+                if (new_free_block->next && new_free_block->next->free && 
+                    is_valid_block(new_free_block->next)) {
+                    heap_block_t* next_block = new_free_block->next;
+                    new_free_block->size += next_block->size;
+                    new_free_block->next = next_block->next;
+                }
+            }
+        }
+        return ptr; // Aynı pointer'ı döndür
     }
 
-    // Allocate new block
+    // Büyütme durumu - önce komşu blokları kontrol et
+    size_t available_size = block->size;
+    heap_block_t* last_block = block;
+    
+    // Sonraki blokları kontrol et ve birleştirilebilecek free blokları say
+    heap_block_t* next = block->next;
+    while (next && next->free && is_valid_block(next) && 
+           (char*)next < (char*)heap->end) {
+        available_size += next->size;
+        last_block = next;
+        next = next->next;
+        
+        // Yeterli alan bulduysak dur
+        if (available_size >= required_total_size) {
+            break;
+        }
+    }
+    
+    // Yeterli alan var mı kontrol et
+    if (available_size >= required_total_size) {
+        // Free blokları birleştir
+        heap_block_t* current_next = block->next;
+        while (current_next && current_next->free && 
+               is_valid_block(current_next) && current_next != last_block->next) {
+            heap->free -= current_next->size; // Free space'den çıkar
+            block->size += current_next->size;
+            current_next = current_next->next;
+        }
+        block->next = last_block->next;
+        
+        // Eğer blok hala çok büyükse, fazla kısmını böl
+        if (block->size >= required_total_size + sizeof(heap_block_t) + sizeof(void*)) {
+            heap_block_t* new_free_block = (heap_block_t*)((char*)block + required_total_size);
+            
+            if ((char*)new_free_block + sizeof(heap_block_t) <= (char*)heap->end) {
+                new_free_block->size = block->size - required_total_size;
+                new_free_block->free = true;
+                new_free_block->magic = HEAP_MAGIC;
+                new_free_block->next = block->next;
+                
+                block->size = required_total_size;
+                block->next = new_free_block;
+                
+                heap->free += new_free_block->size;
+            }
+        }
+        
+        // Veri büyürken eski veriyi koru (zaten aynı yerde)
+        return ptr;
+    }
+    
+    // Komşu bloklar yeterli değil, yeni allocation gerekli
     void* new_ptr = heap_alloc(heap, new_size);
     if (!new_ptr) {
         return NULL;
     }
 
-    // Copy old data to new block
-    memcpy(new_ptr, ptr, old_data_size < new_size ? old_data_size : new_size);
+    // Eski veriyi yeni konuma kopyala
+    size_t copy_size = (old_data_size < aligned_new_size) ? old_data_size : aligned_new_size;
+    memcpy(new_ptr, ptr, copy_size);
 
-    // Free old block
+    // Eski bloku free et
     heap_free(heap, ptr);
 
     return new_ptr;

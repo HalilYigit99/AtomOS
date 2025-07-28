@@ -22,18 +22,7 @@ void __kernel_setup()
     // Setup kernel heap
     __kernelHeap_setup();
 
-    void *test = heap_alloc(&kernel_heap, 1024); // Example address for testing
-    void* other = heap_realloc(&kernel_heap, test, 2048); // Reallocate to a larger size
-    if (test == other)
-    {
-        // Allocation successful, do something with test
-        __screen_fill(0xFF00); // Fill screen with green color as a test
-    }
-    else
-    {
-        // Allocation failed, handle error
-        __screen_fill(0xFF0000); // Fill screen with red color to indicate failure
-    }
+    
 
 }
 
