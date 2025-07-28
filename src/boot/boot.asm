@@ -4,7 +4,6 @@ global _start
 
 global mb2_tagptr
 extern intel86_setup
-extern multiboot2_parse
 extern __kernel_setup
 
 extern __stack_start
@@ -12,16 +11,15 @@ extern __stack_end
 
 use32
 _start:
+    cli ; Disable interrupts
     ; Save the Multiboot2 tag pointer
     mov [mb2_tagptr], ebx
 
+    cmp eax, 0x36d76289 ; Check if the magic number is correct
+    jne .ret ;
+
     ; Set up the stack pointer
     mov esp, __stack_end
-
-    ; Parse Multiboot2 information
-    push ebx                ; Push multiboot2 info address
-    call multiboot2_parse
-    add esp, 4              ; Clean up stack
 
     ; Initialize the Intel 86 architecture
     call intel86_setup
@@ -32,6 +30,10 @@ _start:
 .halt:
     hlt
     jmp .halt  ; Infinite loop to halt the CPU
+
+.ret:
+    ; If the magic number is incorrect, halt the CPU
+    ret
 
 
 section .data

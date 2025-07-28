@@ -319,33 +319,6 @@ bool is_user_address(const void* ptr) {
     return true;
 }
 
-// Memory debugging utilities
-void memory_dump(const void* ptr, size_t size) {
-    if (!ptr || size == 0) {
-        return;
-    }
-
-    const unsigned char* p = (const unsigned char*)ptr;
-    
-    for (size_t i = 0; i < size; i += 16) {
-        // Print address
-        // printf("%08x: ", (uintptr_t)p + i);
-        
-        // Print hex bytes
-        for (size_t j = 0; j < 16 && i + j < size; j++) {
-            // printf("%02x ", p[i + j]);
-        }
-        
-        // Print ASCII representation
-        for (size_t j = 0; j < 16 && i + j < size; j++) {
-            char c = p[i + j];
-            // printf("%c", (c >= 32 && c <= 126) ? c : '.');
-        }
-        
-        // printf("\n");
-    }
-}
-
 void memory_pattern_fill(void* ptr, size_t size, uint32_t pattern) {
     if (!ptr || size == 0) {
         return;

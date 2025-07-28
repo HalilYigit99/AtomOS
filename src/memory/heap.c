@@ -73,9 +73,7 @@ void* heap_alloc(heap_t* heap, size_t size) {
 
     // Best fit algorithm - find the smallest block that fits
     heap_block_t* best_block = NULL;
-    heap_block_t* best_prev = NULL;
     heap_block_t* current = (heap_block_t*)heap->start;
-    heap_block_t* prev = NULL;
 
     while (current && (char*)current < (char*)heap->end) {
         if (!is_valid_block(current)) {
@@ -86,11 +84,9 @@ void* heap_alloc(heap_t* heap, size_t size) {
             // This block can fit our allocation
             if (!best_block || current->size < best_block->size) {
                 best_block = current;
-                best_prev = prev;
             }
         }
 
-        prev = current;
         current = current->next;
     }
 
@@ -177,7 +173,6 @@ void heap_free(heap_t* heap, void* ptr) {
 
     // Coalesce with previous block if it's free
     heap_block_t* current = (heap_block_t*)heap->start;
-    heap_block_t* prev = NULL;
 
     while (current && current != block) {
         if (current->next == block && current->free && is_valid_block(current)) {
@@ -185,7 +180,6 @@ void heap_free(heap_t* heap, void* ptr) {
             current->next = block->next;
             break;
         }
-        prev = current;
         current = current->next;
     }
 }

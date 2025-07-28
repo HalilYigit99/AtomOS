@@ -6,126 +6,94 @@
 #include <memory/memory.h>
 #include <memory/heap.h>
 
-#define KHEAP_MIN_SIZE 0x1000000 // 16 MB for kernel heap
-#define KERNEL_START 0x100000 // 1 MB start address for kernel heap
-#define MULTIBOOT_MEMORY_AVAILABLE 1 // Available memory type in memory map
-
 extern char __kernel_end; // End of kernel binary
 
-// Best fit algorithm to find suitable memory region for kernel heap
-static struct multiboot_mmap_entry* find_best_fit_memory(size_t required_size, uint64_t* heap_start, uint64_t* heap_end) {
-    if (!mb2_mmap) {
-        return NULL;
+void __kernelHeap_setup();
+void __screen_fill(uint32_t color);
+
+void __kernel_setup()
+{
+
+    // Parse multiboot2 tags first
+    multiboot2_parse();
+
+    __screen_fill(0xFFFFFFFF); // Fill screen with white color
+
+    // Setup kernel heap
+    __kernelHeap_setup();
+
+    void *test = heap_alloc(&kernel_heap, 1024); // Example address for testing
+    void* other = heap_realloc(&kernel_heap, test, 2048); // Reallocate to a larger size
+    if (test == other)
+    {
+        // Allocation successful, do something with test
+        __screen_fill(0xFF00); // Fill screen with green color as a test
     }
-    
-    struct multiboot_mmap_entry* best_entry = NULL;
-    uint64_t best_size = UINT64_MAX;
-    uint64_t kernel_start_addr = (uint64_t)KERNEL_START;
-    uint64_t kernel_end_addr = (uint64_t)&__kernel_end;
-    
-    // Iterate through memory map entries
-    size_t entry_count = (mb2_mmap->size - sizeof(struct multiboot_tag_mmap)) / mb2_mmap->entry_size;
-    
-    for (size_t i = 0; i < entry_count; i++) {
-        struct multiboot_mmap_entry* entry = &mb2_mmap->entries[i];
-        
-        // Only consider available memory regions
-        if (entry->type != MULTIBOOT_MEMORY_AVAILABLE) {
-            continue;
-        }
-        
-        uint64_t region_start = entry->addr;
-        uint64_t region_end = entry->addr + entry->len;
-        uint64_t available_start = region_start;
-        uint64_t available_end = region_end;
-        
-        // Check if this region overlaps with kernel
-        if (region_start < kernel_end_addr && region_end > kernel_start_addr) {
-            // Region overlaps with kernel, calculate non-overlapping parts
-            if (region_start < kernel_start_addr) {
-                // Check space before kernel
-                uint64_t before_kernel_size = kernel_start_addr - region_start;
-                if (before_kernel_size >= required_size) {
-                    // Space before kernel is sufficient
-                    available_start = region_start;
-                    available_end = kernel_start_addr;
-                } else {
-                    // Check space after kernel
-                    if (kernel_end_addr < region_end) {
-                        uint64_t after_kernel_size = region_end - kernel_end_addr;
-                        if (after_kernel_size >= required_size) {
-                            available_start = kernel_end_addr;
-                            available_end = region_end;
-                        } else {
-                            continue; // Not enough space
-                        }
-                    } else {
-                        continue; // Not enough space
-                    }
-                }
-            } else {
-                // Region starts after kernel start but before kernel end
-                if (kernel_end_addr < region_end) {
-                    uint64_t after_kernel_size = region_end - kernel_end_addr;
-                    if (after_kernel_size >= required_size) {
-                        available_start = kernel_end_addr;
-                        available_end = region_end;
-                    } else {
-                        continue; // Not enough space
-                    }
-                } else {
-                    continue; // Not enough space
-                }
-            }
-        }
-        
-        uint64_t available_size = available_end - available_start;
-        
-        // Check if this region has enough space
-        if (available_size >= required_size) {
-            // Best fit: choose the smallest sufficient region
-            if (available_size < best_size) {
-                best_size = available_size;
-                best_entry = entry;
-                *heap_start = available_start;
-                *heap_end = available_start + required_size; // Only allocate what we need
-            }
-        }
+    else
+    {
+        // Allocation failed, handle error
+        __screen_fill(0xFF0000); // Fill screen with red color to indicate failure
     }
-    
-    return best_entry;
+
 }
 
-void __kernel_setup() {
-    // Ensure multiboot2 information is parsed first
-    if (!mb2_mmap) {
-        // Memory map is not available - cannot setup heap
-        return;
+void __kernelHeap_setup()
+{
+    // Check if memory map is available
+    if (!mb2_mmap)
+    {
+        // No memory map available, cannot setup heap
+        asm volatile ("cli; hlt"); // Halt the system
     }
-    
-    // Look for the kernel heap in the memory map using best fit algorithm
-    uint64_t heap_start_addr = 0;
-    uint64_t heap_end_addr = 0;
-    
-    // Find the best memory region for kernel heap
-    struct multiboot_mmap_entry* heap_region = find_best_fit_memory(KHEAP_MIN_SIZE, &heap_start_addr, &heap_end_addr);
-    
-    if (!heap_region) {
-        // No suitable memory region found - this is a critical error
-        // In a real OS, you might want to panic here
-        return;
-    }
-    
-    // Ensure heap addresses are properly aligned (4KB alignment)
-    heap_start_addr = (heap_start_addr + 0xFFF) & ~0xFFF;
-    heap_end_addr = (heap_end_addr + 0xFFF) & ~0xFFF;
-    
-    // Ensure we still have enough space after alignment
-    if (heap_end_addr - heap_start_addr < KHEAP_MIN_SIZE) {
-        return;
-    }
-    
-    // Create the kernel heap
-    heap_create(&kernel_heap, (void*)heap_start_addr, (void*)heap_end_addr);
 
+    size_t kernelEnd = (size_t)&__kernel_end;
+
+    heap_create(&kernel_heap, (void*)kernelEnd, (void*)(32 * 1024 * 1024)); // Create kernel heap
+
+}
+
+void __screen_fill(uint32_t color) {
+    // Check if framebuffer info is available
+    if (!mb2_framebuffer) {
+        return;
+    }
+    
+    // Get framebuffer information
+    uint32_t* fb = (uint32_t*)(uintptr_t)mb2_framebuffer->framebuffer_addr;
+    uint32_t width = mb2_framebuffer->framebuffer_width;
+    uint32_t height = mb2_framebuffer->framebuffer_height;
+    uint32_t pitch = mb2_framebuffer->framebuffer_pitch;
+    uint8_t bpp = mb2_framebuffer->framebuffer_bpp;
+    
+    // Check framebuffer type (0 = indexed, 1 = RGB, 2 = EGA text)
+    if (mb2_framebuffer->framebuffer_type != 1) {
+        return; // Only support RGB type
+    }
+    
+    // Fill the screen based on bits per pixel
+    if (bpp == 32) {
+        // 32-bit color mode
+        for (uint32_t y = 0; y < height; y++) {
+            for (uint32_t x = 0; x < width; x++) {
+                // Calculate pixel position using pitch
+                uint32_t pixel_offset = (y * pitch + x * 4) / 4;
+                fb[pixel_offset] = color;
+            }
+        }
+    } else if (bpp == 24) {
+        // 24-bit color mode
+        uint8_t* fb8 = (uint8_t*)(uintptr_t)mb2_framebuffer->framebuffer_addr;
+        uint8_t r = (color >> 16) & 0xFF;
+        uint8_t g = (color >> 8) & 0xFF;
+        uint8_t b = color & 0xFF;
+        
+        for (uint32_t y = 0; y < height; y++) {
+            for (uint32_t x = 0; x < width; x++) {
+                uint32_t pixel_offset = y * pitch + x * 3;
+                fb8[pixel_offset] = b;     // Blue
+                fb8[pixel_offset + 1] = g; // Green
+                fb8[pixel_offset + 2] = r; // Red
+            }
+        }
+    }
 }

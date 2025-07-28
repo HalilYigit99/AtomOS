@@ -22,11 +22,13 @@ struct multiboot_tag_efi32_ih *mb2_efi32_ih = NULL;
 struct multiboot_tag_efi64_ih *mb2_efi64_ih = NULL;
 struct multiboot_tag_load_base_addr *mb2_load_base_addr = NULL;
 
-void multiboot2_parse(uintptr_t mb2_info_addr) {
+extern uint32_t mb2_tagptr; // Pointer to the multiboot2 tags
+
+void multiboot2_parse() {
     struct multiboot_tag *tag;
     
     /* Skip the first 8 bytes (total_size and reserved) */
-    tag = (struct multiboot_tag *)(mb2_info_addr + 8);
+    tag = (struct multiboot_tag *)(mb2_tagptr + 8);
     
     /* Parse all tags */
     while (tag->type != MULTIBOOT_TAG_TYPE_END) {

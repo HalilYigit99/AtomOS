@@ -206,7 +206,7 @@ extern struct multiboot_tag_efi64_ih *mb2_efi64_ih;
 extern struct multiboot_tag_load_base_addr *mb2_load_base_addr;
 
 /* Function prototypes */
-void multiboot2_parse(uintptr_t mb2_info_addr);
+void multiboot2_parse();
 
 #ifdef __cplusplus
 }
