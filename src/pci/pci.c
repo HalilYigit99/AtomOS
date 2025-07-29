@@ -159,9 +159,6 @@ void pci_scan_device(uint8_t bus, uint8_t device) {
     uint16_t vendor_id = pci_config_read16(bus, device, 0, PCI_VENDOR_ID);
     if (vendor_id == PCI_VENDOR_INVALID) return;
     
-    // Debug output
-    kprintf("PCI: Found device at %02x:%02x - Vendor: 0x%04x\n", bus, device, vendor_id);
-    
     pci_scan_function(bus, device, 0);
     
     // Check if multi-function device
@@ -193,14 +190,11 @@ void pci_init(void) {
         return;
     }
     
-    kprintf("PCI: First device found: 0x%08x\n", id);
-    
     // Method 1: Check if there's a host bridge on bus 0
     pci_scan_bus(0);
     
     // Method 2: If no devices found, try brute force scan of first few buses
     if (!pci_devices) {
-        kprintf("PCI: No devices found on bus 0, trying extended scan...\n");
         for (uint8_t bus = 1; bus < 8; bus++) {
             uint16_t vendor = pci_config_read16(bus, 0, 0, PCI_VENDOR_ID);
             if (vendor != 0xFFFF && vendor != 0x0000) {
@@ -218,19 +212,6 @@ void pci_init(void) {
         dev = dev->next;
     }
     
-    kprintf("PCI: Found %d devices\n", count);
-    
-    // If still no devices, provide debug info
-    if (count == 0) {
-        kprintf("PCI: Debug - Testing configuration mechanism...\n");
-        outl(PCI_CONFIG_ADDRESS, 0x80000000);
-        uint32_t test = inl(PCI_CONFIG_ADDRESS);
-        kprintf("PCI: Config test: wrote 0x80000000, read back 0x%08x\n", test);
-        
-        if (test != 0x80000000) {
-            kprintf("PCI: Configuration mechanism 1 not working properly!\n");
-        }
-    }
 }
 
 // Device lookup functions
