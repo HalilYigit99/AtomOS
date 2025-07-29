@@ -1,5 +1,5 @@
 #include <memory/memory.h>
-#include <stdbool.h>
+#include <memory/heap.h>
 
 // Memory alignment macros
 #define WORD_SIZE sizeof(void*)
@@ -402,4 +402,22 @@ int safe_memmove(void* dest, size_t dest_size, const void* src, size_t src_size)
     memmove(dest, src, copy_size);
     
     return (src_size <= dest_size) ? 0 : 1; // 1 indicates truncation
+}
+
+void* kmalloc(size_t size) {
+    if (size == 0) {
+        return NULL;
+    }
+    
+    // Allocate memory from the kernel heap
+    return heap_alloc(&kernel_heap, size);
+}
+
+void kfree(void* ptr) {
+    if (!ptr) {
+        return;
+    }
+
+    // Free memory back to the kernel heap
+    heap_free(&kernel_heap, ptr);
 }

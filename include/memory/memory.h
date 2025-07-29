@@ -52,6 +52,9 @@ void secure_zero(void* ptr, size_t size);
 int safe_memcpy(void* dest, size_t dest_size, const void* src, size_t src_size);
 int safe_memmove(void* dest, size_t dest_size, const void* src, size_t src_size);
 
+void* kmalloc(size_t size);
+void kfree(void* ptr);
+
 #ifdef __cplusplus
 }
 #endif

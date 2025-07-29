@@ -107,7 +107,7 @@ static int uart0_is_transmit_empty() {
 }
 
 // Check if data is available to read
-static int uart0_is_data_ready() {
+static int __attribute__((unused)) uart0_is_data_ready() {
     return inb(UART0_BASE + UART_LINE_STATUS_REG) & UART_LSR_DATA_READY;
 }
 

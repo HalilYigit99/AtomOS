@@ -4,6 +4,7 @@
 #include <memory/memory.h>
 #include <memory/heap.h>
 #include <stream/OutputStream.h>
+#include <pci/pci.h>
 
 extern char __kernel_end; // End of kernel binary
 
@@ -27,7 +28,11 @@ void __kernel_setup()
 
     currentOutputStream->printf("Kernel heap setup completed.\n");
 
-    
+    pci_init(); // Initialize PCI subsystem
+
+    currentOutputStream->printf("\n======= PCI Devices =======\n");
+    pci_print_all_devices();
+    currentOutputStream->printf("\n======= PCI Devices =======\n");
 
 }
 

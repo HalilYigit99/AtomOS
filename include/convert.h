@@ -5,8 +5,15 @@ extern "C" {
 #endif
 
 #include <stdint.h>
-#include <stddef.h>
 #include <stdbool.h>
+#include <stddef.h>
+
+// String manipulation
+void reverseString(char* str, int length);
+
+// Number digit counting
+int numDigits(long long value, int base);
+int numDigitsUnsigned(unsigned long long value, int base);
 
 // Integer to string conversions
 char* itoa(int value, char* buffer, int base);
@@ -21,12 +28,7 @@ char* ulltoa(unsigned long long value, char* buffer, int base);
 // Pointer to string conversion
 char* ptoa(void* ptr, char* buffer);
 
-// Helper functions
-int numDigits(long long value, int base);
-int numDigitsUnsigned(unsigned long long value, int base);
-void reverseString(char* str, int length);
-
-// Float/Double conversions (basic implementation)
+// Floating point to string conversions
 char* ftoa(float value, char* buffer, int precision);
 char* dtoa(double value, char* buffer, int precision);
 

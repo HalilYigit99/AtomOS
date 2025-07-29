@@ -1,5 +1,10 @@
 #include <stream/VPrintf.h>
-#include "convert.h"
+#include <convert.h>
+#include <memory/memory.h>
+#include <stdint.h>
+
+// Configuration: Toggle between gcc.asm and working version
+#define USE_GCC_ASM 0  // 1 = use gcc.asm (BROKEN), 0 = use working version (WORKS)
 
 // Printf format flags
 typedef struct {
@@ -30,6 +35,7 @@ static int parseNumber(const char** format) {
 
 static FormatFlags parseFlags(const char** format) {
     FormatFlags flags = {0};
+    flags.precision = 6; // Default precision for floating point
     
     // Parse flags
     bool parsing = true;
@@ -39,13 +45,23 @@ static FormatFlags parseFlags(const char** format) {
             case '+': flags.showSign = true; (*format)++; break;
             case ' ': flags.spaceSign = true; (*format)++; break;
             case '#': flags.alternate = true; (*format)++; break;
-            case '0': flags.zeroPad = true; (*format)++; break;
+            case '0': 
+                if (!flags.leftAlign) { // '0' flag is ignored if '-' flag is present
+                    flags.zeroPad = true; 
+                }
+                (*format)++; 
+                break;
             default: parsing = false; break;
         }
     }
     
-    // Parse width
-    if (**format >= '1' && **format <= '9') {
+    // Parse width (including leading zeros)
+    if (**format >= '0' && **format <= '9') {
+        // If we see a '0' after flags, this could be width with zero padding
+        if (**format == '0' && !flags.zeroPad) {
+            flags.zeroPad = true;
+            (*format)++;
+        }
         flags.width = parseNumber(format);
     } else if (**format == '*') {
         flags.width = -1; // Will be read from va_list
@@ -69,13 +85,17 @@ static FormatFlags parseFlags(const char** format) {
     return flags;
 }
 
-static void printPadding(void(*putChar)(char), int count, char padChar) {
+static int printPadding(void(*putChar)(char), int count, char padChar) {
+    int printed = 0;
     for (int i = 0; i < count; i++) {
         putChar(padChar);
+        printed++;
     }
+    return printed;
 }
 
-static void printString(void(*putChar)(char), const char* str, FormatFlags flags) {
+static int printString(void(*putChar)(char), const char* str, FormatFlags flags) {
+    int printed = 0;
     if (!str) str = "(null)";
     
     int len = strlen(str);
@@ -86,33 +106,66 @@ static void printString(void(*putChar)(char), const char* str, FormatFlags flags
     int padding = flags.width - len;
     
     if (!flags.leftAlign && padding > 0) {
-        printPadding(putChar, padding, ' ');
+        printed += printPadding(putChar, padding, ' ');
     }
     
     for (int i = 0; i < len; i++) {
         putChar(str[i]);
+        printed++;
     }
     
     if (flags.leftAlign && padding > 0) {
-        printPadding(putChar, padding, ' ');
+        printed += printPadding(putChar, padding, ' ');
     }
+    
+    return printed;
 }
 
-static void printNumber(void(*putChar)(char), long long value, int base, bool uppercase, FormatFlags flags) {
+static int printNumber(void(*putChar)(char), long long value, int base, bool uppercase, FormatFlags flags) {
+    int printed = 0;
     char buffer[66]; // Enough for 64-bit binary + sign + null
-    lltoa(value, buffer, base);
     
-    // Handle uppercase for hex
-    if (uppercase && base == 16) {
-        for (int i = 0; buffer[i]; i++) {
-            if (buffer[i] >= 'a' && buffer[i] <= 'f') {
-                buffer[i] = buffer[i] - 'a' + 'A';
-            }
+    // Manual number conversion to ensure it works
+    char* ptr = buffer;
+    bool isNegative = false;
+    
+    if (value < 0 && base == 10) {
+        isNegative = true;
+        value = -value;
+    }
+    
+    // Convert to string manually
+    int i = 0;
+    if (value == 0) {
+        ptr[i++] = '0';
+    } else {
+        const char* digits = uppercase ? "0123456789ABCDEF" : "0123456789abcdef";
+        
+        // Build string in reverse using proper 64-bit arithmetic
+        long long temp = value;
+        while (temp > 0) {
+            long long remainder = temp % base;
+            ptr[i++] = digits[remainder];
+            temp = temp / base;
+        }
+        
+        // Add negative sign
+        if (isNegative) {
+            ptr[i++] = '-';
+        }
+        
+        // Reverse the string
+        for (int j = 0; j < i / 2; j++) {
+            char temp_char = ptr[j];
+            ptr[j] = ptr[i - 1 - j];
+            ptr[i - 1 - j] = temp_char;
         }
     }
     
-    int len = strlen(buffer);
-    bool hasSign = buffer[0] == '-';
+    ptr[i] = '\0';
+    
+    int len = i;
+    bool hasSign = (isNegative || ptr[0] == '-');
     
     // Calculate prefix length
     int prefixLen = 0;
@@ -130,58 +183,149 @@ static void printNumber(void(*putChar)(char), long long value, int base, bool up
     
     // Print left padding (spaces)
     if (!flags.leftAlign && !flags.zeroPad && padding > 0) {
-        printPadding(putChar, padding, ' ');
+        printed += printPadding(putChar, padding, ' ');
     }
     
     // Print prefix
     if (hasSign) {
-        putChar('-');
+        putChar(ptr[0]); // This is the '-' sign
+        printed++;
     } else if (flags.showSign) {
         putChar('+');
+        printed++;
     } else if (flags.spaceSign) {
         putChar(' ');
+        printed++;
     }
     
     if (flags.alternate) {
         if (base == 8 && buffer[0] != '0') {
             putChar('0');
+            printed++;
         } else if (base == 16 && value != 0) {
             putChar('0');
             putChar(uppercase ? 'X' : 'x');
+            printed += 2;
         }
     }
     
     // Print zero padding
     if (!flags.leftAlign && flags.zeroPad && padding > 0) {
-        printPadding(putChar, padding, '0');
+        printed += printPadding(putChar, padding, '0');
     }
     
     // Print number (skip sign if already printed)
     const char* numStart = hasSign ? buffer + 1 : buffer;
     while (*numStart) {
         putChar(*numStart++);
+        printed++;
     }
     
     // Print right padding
     if (flags.leftAlign && padding > 0) {
-        printPadding(putChar, padding, ' ');
+        printed += printPadding(putChar, padding, ' ');
     }
+    
+    return printed;
 }
 
-static void printUnsignedNumber(void(*putChar)(char), unsigned long long value, int base, bool uppercase, FormatFlags flags) {
+static int printUnsignedNumber(void(*putChar)(char), unsigned long long value, int base, bool uppercase, FormatFlags flags) {
+    int printed = 0;
     char buffer[65]; // Enough for 64-bit binary + null
-    ulltoa(value, buffer, base);
     
-    // Handle uppercase for hex
-    if (uppercase && base == 16) {
-        for (int i = 0; buffer[i]; i++) {
-            if (buffer[i] >= 'a' && buffer[i] <= 'f') {
-                buffer[i] = buffer[i] - 'a' + 'A';
+    char* ptr = buffer;
+    int i = 0;
+    
+    if (value == 0) {
+        ptr[i++] = '0';
+    } else {
+        const char* digits = uppercase ? "0123456789ABCDEF" : "0123456789abcdef";
+        
+#if USE_GCC_ASM
+        // Use gcc.asm for 64-bit division
+        unsigned long long temp = value;
+        while (temp > 0) {
+            unsigned long long remainder = temp % base;
+            ptr[i++] = digits[remainder];
+            temp = temp / base;
+        }
+        
+        // Reverse the string
+        for (int j = 0; j < i / 2; j++) {
+            char temp_char = ptr[j];
+            ptr[j] = ptr[i - 1 - j];
+            ptr[i - 1 - j] = temp_char;
+        }
+#else
+        // Working version - bypass gcc.asm issues
+        if (value <= 0xFFFFFFFFUL) {
+            // 32-bit path - safe to use normal division
+            unsigned int temp32 = (unsigned int)value;
+            while (temp32 > 0) {
+                ptr[i++] = digits[temp32 % base];
+                temp32 = temp32 / base;
+            }
+        } else {
+            // 64-bit path - use bit operations for hex, manual for decimal
+            if (base == 16) {
+                // Hex: extract 4-bit nibbles
+                unsigned long long temp = value;
+                while (temp > 0) {
+                    ptr[i++] = digits[temp & 0xF];
+                    temp >>= 4;
+                }
+            } else if (base == 10) {
+                // Decimal: powers of 10 method
+                unsigned long long temp = value;
+                unsigned long long powers[20] = {
+                    1ULL, 10ULL, 100ULL, 1000ULL, 10000ULL,
+                    100000ULL, 1000000ULL, 10000000ULL, 100000000ULL, 1000000000ULL,
+                    10000000000ULL, 100000000000ULL, 1000000000000ULL, 10000000000000ULL,
+                    100000000000000ULL, 1000000000000000ULL, 10000000000000000ULL,
+                    100000000000000000ULL, 1000000000000000000ULL, 10000000000000000000ULL
+                };
+                
+                // Find highest power
+                int powerIndex = 19;
+                while (powerIndex >= 0 && temp < powers[powerIndex]) powerIndex--;
+                
+                // Extract digits
+                for (int p = powerIndex; p >= 0; p--) {
+                    int digit = 0;
+                    while (temp >= powers[p]) {
+                        temp -= powers[p];
+                        digit++;
+                    }
+                    if (digit > 0 || i > 0) {
+                        ptr[i++] = digits[digit];
+                    }
+                }
+                
+                if (i == 0) ptr[i++] = '0';
+                goto skip_reverse; // Already in correct order
+            } else {
+                // Other bases: fallback to hex
+                while (value > 0) {
+                    ptr[i++] = digits[value & 0xF];
+                    value >>= 4;
+                }
             }
         }
+        
+        // Reverse the string (except decimal which is already correct)
+        for (int j = 0; j < i / 2; j++) {
+            char temp_char = ptr[j];
+            ptr[j] = ptr[i - 1 - j];
+            ptr[i - 1 - j] = temp_char;
+        }
+        
+        skip_reverse:;
+#endif
     }
     
-    int len = strlen(buffer);
+    ptr[i] = '\0';
+    
+    int len = i;
     int prefixLen = 0;
     
     if (flags.alternate) {
@@ -194,37 +338,42 @@ static void printUnsignedNumber(void(*putChar)(char), unsigned long long value, 
     
     // Print left padding
     if (!flags.leftAlign && !flags.zeroPad && padding > 0) {
-        printPadding(putChar, padding, ' ');
+        printed += printPadding(putChar, padding, ' ');
     }
     
     // Print prefix
     if (flags.alternate) {
         if (base == 8 && buffer[0] != '0') {
             putChar('0');
+            printed++;
         } else if (base == 16 && value != 0) {
             putChar('0');
             putChar(uppercase ? 'X' : 'x');
+            printed += 2;
         }
     }
     
     // Print zero padding
     if (!flags.leftAlign && flags.zeroPad && padding > 0) {
-        printPadding(putChar, padding, '0');
+        printed += printPadding(putChar, padding, '0');
     }
     
     // Print number
-    const char* ptr = buffer;
-    while (*ptr) {
-        putChar(*ptr++);
+    const char* numPtr = buffer;
+    while (*numPtr) {
+        putChar(*numPtr++);
+        printed++;
     }
     
     // Print right padding
     if (flags.leftAlign && padding > 0) {
-        printPadding(putChar, padding, ' ');
+        printed += printPadding(putChar, padding, ' ');
     }
+    
+    return printed;
 }
 
-static void printFloat(void(*putChar)(char), double value, FormatFlags flags) {
+static int printFloat(void(*putChar)(char), double value, FormatFlags flags) {
     char buffer[128];
     int precision = flags.hasPrecision ? flags.precision : 6;
     
@@ -232,13 +381,16 @@ static void printFloat(void(*putChar)(char), double value, FormatFlags flags) {
     dtoa(value, buffer, precision);
     
     // Print as string with formatting
-    printString(putChar, buffer, flags);
+    return printString(putChar, buffer, flags);
 }
 
 int vprintf(void(*putChar)(char), const char* format, va_list list) {
+    int printed = 0;
+    
     while (*format) {
         if (*format != '%') {
             putChar(*format++);
+            printed++;
             continue;
         }
         
@@ -247,6 +399,7 @@ int vprintf(void(*putChar)(char), const char* format, va_list list) {
         // Check for %%
         if (*format == '%') {
             putChar('%');
+            printed++;
             format++;
             continue;
         }
@@ -308,7 +461,7 @@ int vprintf(void(*putChar)(char), const char* format, va_list list) {
                 else if (length == 1) value = va_arg(list, long);
                 else value = va_arg(list, long long);
                 
-                printNumber(putChar, value, 10, false, flags);
+                printed += printNumber(putChar, value, 10, false, flags);
                 break;
             }
             
@@ -320,7 +473,7 @@ int vprintf(void(*putChar)(char), const char* format, va_list list) {
                 else if (length == 1) value = va_arg(list, unsigned long);
                 else value = va_arg(list, unsigned long long);
                 
-                printUnsignedNumber(putChar, value, 10, false, flags);
+                printed += printUnsignedNumber(putChar, value, 10, false, flags);
                 break;
             }
             
@@ -332,7 +485,7 @@ int vprintf(void(*putChar)(char), const char* format, va_list list) {
                 else if (length == 1) value = va_arg(list, unsigned long);
                 else value = va_arg(list, unsigned long long);
                 
-                printUnsignedNumber(putChar, value, 8, false, flags);
+                printed += printUnsignedNumber(putChar, value, 8, false, flags);
                 break;
             }
             
@@ -345,40 +498,72 @@ int vprintf(void(*putChar)(char), const char* format, va_list list) {
                 else if (length == 1) value = va_arg(list, unsigned long);
                 else value = va_arg(list, unsigned long long);
                 
-                printUnsignedNumber(putChar, value, 16, *format == 'X', flags);
+                printed += printUnsignedNumber(putChar, value, 16, *format == 'X', flags);
                 break;
             }
             
             case 'c': {
                 char c = (char)va_arg(list, int);
                 if (!flags.leftAlign && flags.width > 1) {
-                    printPadding(putChar, flags.width - 1, ' ');
+                    printed += printPadding(putChar, flags.width - 1, ' ');
                 }
                 putChar(c);
+                printed++;
                 if (flags.leftAlign && flags.width > 1) {
-                    printPadding(putChar, flags.width - 1, ' ');
+                    printed += printPadding(putChar, flags.width - 1, ' ');
                 }
                 break;
             }
             
             case 's': {
                 const char* str = va_arg(list, const char*);
-                printString(putChar, str, flags);
+                printed += printString(putChar, str, flags);
                 break;
             }
             
             case 'p': {
                 void* ptr = va_arg(list, void*);
+                
+                // Manual pointer formatting
+                uintptr_t value = (uintptr_t)ptr;
                 char buffer[20];
-                ptoa(ptr, buffer);
-                printString(putChar, buffer, flags);
+                
+                // Add "0x" prefix
+                buffer[0] = '0';
+                buffer[1] = 'x';
+                
+                // Convert to hex manually
+                char* ptr_buf = buffer + 2;
+                int i = 0;
+                
+                if (value == 0) {
+                    ptr_buf[i++] = '0';
+                } else {
+                    const char* digits = "0123456789abcdef";
+                    // Build in reverse
+                    uintptr_t temp = value;
+                    while (temp > 0) {
+                        ptr_buf[i++] = digits[temp & 0xF];
+                        temp >>= 4;
+                    }
+                    
+                    // Reverse the hex part
+                    for (int j = 0; j < i / 2; j++) {
+                        char temp_char = ptr_buf[j];
+                        ptr_buf[j] = ptr_buf[i - 1 - j];
+                        ptr_buf[i - 1 - j] = temp_char;
+                    }
+                }
+                
+                ptr_buf[i] = '\0';
+                printed += printString(putChar, buffer, flags);
                 break;
             }
             
             case 'f':
             case 'F': {
                 double value = va_arg(list, double);
-                printFloat(putChar, value, flags);
+                printed += printFloat(putChar, value, flags);
                 break;
             }
             
@@ -388,13 +573,14 @@ int vprintf(void(*putChar)(char), const char* format, va_list list) {
             case 'G': {
                 // For now, treat as 'f'
                 double value = va_arg(list, double);
-                printFloat(putChar, value, flags);
+                printed += printFloat(putChar, value, flags);
                 break;
             }
             
             case 'n': {
                 // Number of characters written so far
-                // Not implemented for security reasons
+                int* ptr = va_arg(list, int*);
+                if (ptr) *ptr = printed;
                 break;
             }
             
@@ -402,11 +588,12 @@ int vprintf(void(*putChar)(char), const char* format, va_list list) {
                 // Unknown format, just print it
                 putChar('%');
                 putChar(*format);
+                printed += 2;
                 break;
         }
         
         format++;
     }
 
-    return 1;
+    return printed;
 }

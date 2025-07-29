@@ -1,13 +1,141 @@
 ; gcc.asm - GCC compiler helper functions for 64-bit arithmetic on 32-bit systems
 ; These functions are required by GCC for 64-bit division operations on i386
+; Based on LLVM compiler-rt and GLIBC libgcc implementations
 
 BITS 32
 
 section .text
 
+; Unsigned 64-bit division with remainder
+; Input: EDX:EAX = dividend, ECX:EBX = divisor
+; Output: EDX:EAX = quotient, ECX:EBX = remainder
+global __udivmoddi4
+__udivmoddi4:
+    push ebp
+    mov ebp, esp
+    push edi
+    push esi
+    push ebx
+
+    ; Load arguments from stack
+    mov eax, [ebp+8]    ; dividend low
+    mov edx, [ebp+12]   ; dividend high
+    mov ebx, [ebp+16]   ; divisor low
+    mov ecx, [ebp+20]   ; divisor high
+
+    ; Test for 32-bit case
+    test ecx, ecx
+    jnz .L4
+    cmp edx, ebx
+    jae .L3
+    
+    ; Case: dividend < divisor (32-bit)
+    div ebx
+    mov ecx, edx        ; remainder
+    xor edx, edx        ; high quotient = 0
+    xor ebx, ebx        ; high remainder = 0
+    jmp .L6
+
+.L3:
+    ; Case: dividend high >= divisor (32-bit)
+    mov ecx, eax        ; save dividend low
+    mov eax, edx        ; dividend high
+    xor edx, edx
+    div ebx             ; divide high part
+    xchg eax, ecx       ; quotient high -> ecx, dividend low -> eax
+    div ebx             ; divide low part
+    mov edx, ecx        ; quotient high
+    mov ecx, eax        ; quotient low
+    mov eax, ecx        ; restore eax
+    mov ecx, edx        ; remainder in ecx
+    xor ebx, ebx        ; high remainder = 0
+    jmp .L6
+
+.L4:
+    ; Full 64-bit division
+    cmp ecx, edx
+    ja .L5
+    jb .L8
+    cmp ebx, eax
+    ja .L5
+
+.L8:
+    ; Use binary long division algorithm
+    push edi
+    push esi
+    
+    ; Initialize
+    xor edi, edi        ; quotient high
+    xor esi, esi        ; quotient low
+    mov ebp, 64         ; bit counter
+
+.L9:
+    ; Shift dividend left
+    shl eax, 1
+    rcl edx, 1
+    
+    ; Shift quotient left
+    shl esi, 1
+    rcl edi, 1
+    
+    ; Compare with divisor
+    cmp edx, ecx
+    jb .L10
+    ja .L11
+    cmp eax, ebx
+    jb .L10
+
+.L11:
+    ; Subtract divisor
+    sub eax, ebx
+    sbb edx, ecx
+    inc esi             ; set quotient bit
+
+.L10:
+    dec ebp
+    jnz .L9
+    
+    ; Move results
+    mov ecx, edx        ; remainder high
+    mov ebx, eax        ; remainder low
+    mov eax, esi        ; quotient low
+    mov edx, edi        ; quotient high
+    
+    pop esi
+    pop edi
+    jmp .L6
+
+.L5:
+    ; Quotient is zero
+    mov ecx, edx        ; remainder = dividend
+    mov ebx, eax
+    xor eax, eax        ; quotient = 0
+    xor edx, edx
+
+.L6:
+    pop ebx
+    pop esi
+    pop edi
+    pop ebp
+    ret
+
+; Unsigned 64-bit division
+; Returns quotient only
+global __udivdi3
+__udivdi3:
+    call __udivmoddi4
+    ret
+
+; Unsigned 64-bit modulo
+; Returns remainder only
+global __umoddi3
+__umoddi3:
+    call __udivmoddi4
+    mov eax, ebx
+    mov edx, ecx
+    ret
+
 ; Signed 64-bit division with remainder
-; Stack: [divisor_low][divisor_high][dividend_low][dividend_high][ret_addr]
-; Returns: EDX:EAX = quotient, ECX:EBX = remainder
 global __divmoddi4
 __divmoddi4:
     push ebp
@@ -15,263 +143,79 @@ __divmoddi4:
     push edi
     push esi
     push ebx
-    
+
     ; Load arguments
     mov eax, [ebp+8]    ; dividend low
     mov edx, [ebp+12]   ; dividend high
     mov ebx, [ebp+16]   ; divisor low
     mov ecx, [ebp+20]   ; divisor high
-    
-    ; Check signs and make positive
+
+    ; Determine result signs
     xor edi, edi        ; quotient sign
     xor esi, esi        ; remainder sign
-    
+
     ; Check dividend sign
     test edx, edx
-    jns .check_divisor
+    jns .LD1
     ; Negate dividend
-    not eax
-    not edx
-    add eax, 1
+    neg eax
     adc edx, 0
-    inc edi             ; Toggle quotient sign
-    inc esi             ; Remainder has dividend sign
-    
-.check_divisor:
+    neg edx
+    inc edi             ; quotient negative
+    inc esi             ; remainder has dividend sign
+
+.LD1:
     ; Check divisor sign
     test ecx, ecx
-    jns .do_divide
+    jns .LD2
     ; Negate divisor
-    not ebx
-    not ecx
-    add ebx, 1
+    neg ebx
     adc ecx, 0
-    inc edi             ; Toggle quotient sign
-    
-.do_divide:
-    ; Save dividend for remainder calculation
-    push edx
-    push eax
-    push ecx
-    push ebx
-    
-    ; Perform unsigned 64-bit division
-    call __udivmoddi4_internal
-    
-    ; Apply signs
+    neg ecx
+    inc edi             ; toggle quotient sign
+
+.LD2:
+    ; Perform unsigned division
+    push edi
+    push esi
+    call __udivmoddi4
+    pop esi
+    pop edi
+
+    ; Apply quotient sign
     test edi, edi
-    jz .check_remainder_sign
-    ; Negate quotient
-    not eax
-    not edx
-    add eax, 1
+    jz .LD3
+    neg eax
     adc edx, 0
-    
-.check_remainder_sign:
+    neg edx
+
+.LD3:
+    ; Apply remainder sign
     test esi, esi
-    jz .done
-    ; Negate remainder
-    not ebx
-    not ecx
-    add ebx, 1
+    jz .LD4
+    neg ebx
     adc ecx, 0
-    
-.done:
-    ; Return values in EDX:EAX (quotient) and ECX:EBX (remainder)
-    pop esi
-    pop esi
-    pop esi
-    pop esi
-    
+    neg ecx
+
+.LD4:
     pop ebx
     pop esi
     pop edi
     pop ebp
-    ret
-
-; Internal unsigned 64-bit division
-; Input: EDX:EAX = dividend, ECX:EBX = divisor
-; Output: EDX:EAX = quotient, ECX:EBX = remainder
-__udivmoddi4_internal:
-    push edi
-    push esi
-    
-    ; Check for 32-bit divisor
-    test ecx, ecx
-    jnz .full_64bit_divide
-    
-    ; 32-bit divisor case
-    mov ecx, eax
-    mov eax, edx
-    xor edx, edx
-    div ebx
-    push eax        ; Save high quotient
-    mov eax, ecx
-    div ebx
-    mov ecx, edx    ; Remainder in ECX
-    xor ebx, ebx    ; High remainder is 0
-    pop edx         ; Restore high quotient
-    jmp .div_done
-    
-.full_64bit_divide:
-    ; Full 64-bit division using bit-by-bit algorithm
-    push ebp
-    mov edi, 64     ; Loop counter
-    xor esi, esi    ; Remainder high
-    xor ebp, ebp    ; Remainder low
-    
-.div_loop:
-    ; Shift dividend left by 1
-    shl eax, 1
-    rcl edx, 1
-    
-    ; Shift remainder left by 1 and add new bit
-    rcl ebp, 1
-    rcl esi, 1
-    
-    ; Compare remainder with divisor
-    cmp esi, ecx
-    jb .next_bit
-    ja .subtract
-    cmp ebp, ebx
-    jb .next_bit
-    
-.subtract:
-    ; Subtract divisor from remainder
-    sub ebp, ebx
-    sbb esi, ecx
-    ; Set quotient bit
-    or eax, 1
-    
-.next_bit:
-    dec edi
-    jnz .div_loop
-    
-    mov ecx, esi    ; Remainder high
-    mov ebx, ebp    ; Remainder low
-    pop ebp
-    
-.div_done:
-    pop esi
-    pop edi
     ret
 
 ; Signed 64-bit division
-; Stack: [divisor_low][divisor_high][dividend_low][dividend_high][ret_addr]
 global __divdi3
 __divdi3:
-    push ebp
-    mov ebp, esp
-    
-    ; Call divmod and ignore remainder
-    push dword [ebp+20]
-    push dword [ebp+16]
-    push dword [ebp+12]
-    push dword [ebp+8]
     call __divmoddi4
-    add esp, 16
-    
-    pop ebp
-    ret
-
-; Unsigned 64-bit division
-; Stack: [divisor_low][divisor_high][dividend_low][dividend_high][ret_addr]
-global __udivdi3
-__udivdi3:
-    push ebp
-    mov ebp, esp
-    push ebx
-    push esi
-    push edi
-    
-    ; Load arguments
-    mov eax, [ebp+8]    ; dividend low
-    mov edx, [ebp+12]   ; dividend high
-    mov ebx, [ebp+16]   ; divisor low
-    mov ecx, [ebp+20]   ; divisor high
-    
-    call __udivmoddi4_internal
-    
-    pop edi
-    pop esi
-    pop ebx
-    pop ebp
-    ret
-
-; Unsigned 64-bit division with remainder
-; Stack: [divisor_low][divisor_high][dividend_low][dividend_high][ret_addr]
-global __udivmoddi4
-__udivmoddi4:
-    push ebp
-    mov ebp, esp
-    push ebx
-    push esi
-    push edi
-    
-    ; Load arguments
-    mov eax, [ebp+8]    ; dividend low
-    mov edx, [ebp+12]   ; dividend high
-    mov ebx, [ebp+16]   ; divisor low
-    mov ecx, [ebp+20]   ; divisor high
-    
-    call __udivmoddi4_internal
-    
-    ; Return remainder in ECX:EBX as well
-    mov [ebp+16], ebx   ; Store remainder low
-    mov [ebp+20], ecx   ; Store remainder high
-    
-    pop edi
-    pop esi
-    pop ebx
-    pop ebp
     ret
 
 ; Signed 64-bit modulo
 global __moddi3
 __moddi3:
-    push ebp
-    mov ebp, esp
-    
-    ; Call divmod and return remainder
-    push dword [ebp+20]
-    push dword [ebp+16]
-    push dword [ebp+12]
-    push dword [ebp+8]
     call __divmoddi4
-    add esp, 16
-    
-    ; Move remainder to result
     mov eax, ebx
     mov edx, ecx
-    
-    pop ebp
-    ret
-
-; Unsigned 64-bit modulo
-global __umoddi3
-__umoddi3:
-    push ebp
-    mov ebp, esp
-    push ebx
-    push esi
-    push edi
-    
-    ; Load arguments
-    mov eax, [ebp+8]    ; dividend low
-    mov edx, [ebp+12]   ; dividend high
-    mov ebx, [ebp+16]   ; divisor low
-    mov ecx, [ebp+20]   ; divisor high
-    
-    call __udivmoddi4_internal
-    
-    ; Return remainder
-    mov eax, ebx
-    mov edx, ecx
-    
-    pop edi
-    pop esi
-    pop ebx
-    pop ebp
     ret
 
 ; 64-bit multiplication
