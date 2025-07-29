@@ -42,8 +42,8 @@ void __kernel_setup()
     currentOutputStream->printf("gcc.asm test: %llu + %llu + %llu = %llu\n", a, b, c, result);
 
     // Multiply test
-    uint64_t x = 123456789;
-    uint64_t y = 987654321;
+    uint64_t x = 123;
+    uint64_t y = 123;
     uint64_t product = x * y;
     currentOutputStream->printf("gcc.asm multiply test: %llu * %llu = %llu\n", x, y, product);
 

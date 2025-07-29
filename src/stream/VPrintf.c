@@ -3,9 +3,6 @@
 #include <memory/memory.h>
 #include <stdint.h>
 
-// Configuration: Toggle between gcc.asm and working version
-#define USE_GCC_ASM 1  // 1 = use gcc.asm (BROKEN), 0 = use working version (WORKS)
-
 // Printf format flags
 typedef struct {
     bool leftAlign;      // '-' flag
@@ -241,22 +238,6 @@ static int printUnsignedNumber(void(*putChar)(char), unsigned long long value, i
     } else {
         const char* digits = uppercase ? "0123456789ABCDEF" : "0123456789abcdef";
         
-#if USE_GCC_ASM
-        // Use gcc.asm for 64-bit division
-        unsigned long long temp = value;
-        while (temp > 0) {
-            unsigned long long remainder = temp % base;
-            ptr[i++] = digits[remainder];
-            temp = temp / base;
-        }
-        
-        // Reverse the string
-        for (int j = 0; j < i / 2; j++) {
-            char temp_char = ptr[j];
-            ptr[j] = ptr[i - 1 - j];
-            ptr[i - 1 - j] = temp_char;
-        }
-#else
         // Working version - bypass gcc.asm issues
         if (value <= 0xFFFFFFFFUL) {
             // 32-bit path - safe to use normal division
@@ -320,7 +301,6 @@ static int printUnsignedNumber(void(*putChar)(char), unsigned long long value, i
         }
         
         skip_reverse:;
-#endif
     }
     
     ptr[i] = '\0';
