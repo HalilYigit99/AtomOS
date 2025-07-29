@@ -235,7 +235,7 @@ static void printFloat(void(*putChar)(char), double value, FormatFlags flags) {
     printString(putChar, buffer, flags);
 }
 
-void vprintf(void(*putChar)(char), const char* format, va_list list) {
+int vprintf(void(*putChar)(char), const char* format, va_list list) {
     while (*format) {
         if (*format != '%') {
             putChar(*format++);
@@ -407,4 +407,6 @@ void vprintf(void(*putChar)(char), const char* format, va_list list) {
         
         format++;
     }
+
+    return 1;
 }

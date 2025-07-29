@@ -21,6 +21,7 @@ typedef struct {
 
 } OutputStream;
 
+extern OutputStream* currentOutputStream; // Current output stream
 
 #ifdef __cplusplus
 }

@@ -10,7 +10,7 @@ extern "C" {
 #include <stdbool.h>
 
 // Main vprintf function
-void vprintf(void(*putChar)(char), const char* format, va_list list);
+int vprintf(void(*putChar)(char), const char* format, va_list list);
 
 #ifdef __cplusplus
 }

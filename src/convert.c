@@ -1,7 +1,7 @@
 #include "convert.h"
 
 static const char digits[] = "0123456789abcdefghijklmnopqrstuvwxyz";
-static const char DIGITS[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+static const char __attribute__((unused)) DIGITS[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
 void reverseString(char* str, int length) {
     int start = 0;

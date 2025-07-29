@@ -1,10 +1,9 @@
 #include <stddef.h>
 #include <stdint.h>
-
 #include <boot/multiboot2.h>
-
 #include <memory/memory.h>
 #include <memory/heap.h>
+#include <stream/OutputStream.h>
 
 extern char __kernel_end; // End of kernel binary
 
@@ -14,13 +13,19 @@ void __screen_fill(uint32_t color);
 void __kernel_setup()
 {
 
+    currentOutputStream->Open();
+
     // Parse multiboot2 tags first
     multiboot2_parse();
+
+    currentOutputStream->printf("Kernel setup started...\n");
 
     __screen_fill(0xFFFFFFFF); // Fill screen with white color
 
     // Setup kernel heap
     __kernelHeap_setup();
+
+    currentOutputStream->printf("Kernel heap setup completed.\n");
 
     
 
