@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 // Configuration: Toggle between gcc.asm and working version
-#define USE_GCC_ASM 0  // 1 = use gcc.asm (BROKEN), 0 = use working version (WORKS)
+#define USE_GCC_ASM 1  // 1 = use gcc.asm (BROKEN), 0 = use working version (WORKS)
 
 // Printf format flags
 typedef struct {

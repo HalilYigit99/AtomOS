@@ -34,6 +34,52 @@ void __kernel_setup()
     pci_print_all_devices();
     currentOutputStream->printf("\n======= PCI Devices =======\n");
 
+    currentOutputStream->printf("========== gcc.asm test ==========\n");
+    uint64_t a = 1000000;
+    uint64_t b = 2000000;
+    uint64_t c = 3000000;
+    uint64_t result = a + b + c;
+    currentOutputStream->printf("gcc.asm test: %llu + %llu + %llu = %llu\n", a, b, c, result);
+
+    // Multiply test
+    uint64_t x = 123456789;
+    uint64_t y = 987654321;
+    uint64_t product = x * y;
+    currentOutputStream->printf("gcc.asm multiply test: %llu * %llu = %llu\n", x, y, product);
+
+    // Division test
+
+    uint64_t dividend = 1000000000;
+    uint64_t divisor = 123456;
+    uint64_t quotient = dividend / divisor;
+    uint64_t remainder = dividend % divisor;
+    currentOutputStream->printf("gcc.asm division test: %llu / %llu = %llu, remainder = %llu\n", 
+                                dividend, divisor, quotient, remainder);
+
+    // Shift test
+    uint64_t shift_value = 1;
+    uint64_t left_shift = shift_value << 3; // Shift left by 3
+    uint64_t right_shift = shift_value >> 2; // Shift right by 2
+    currentOutputStream->printf("gcc.asm shift test: %llu << 3 = %llu, %llu >> 2 = %llu\n", 
+                                shift_value, left_shift, right_shift, right_shift);
+
+    // Bitwise AND test
+    uint64_t and_value1 = 0xF0F0F0F0;
+    uint64_t and_value2 = 0x0F0F0F0F;
+    uint64_t and_result = and_value1 & and_value2;
+    currentOutputStream->printf("gcc.asm AND test: 0x%llX & 0x%llX = 0x%llX\n", 
+                                and_value1, and_value2, and_result);
+
+    uint64_t aa = 50000;
+    uint64_t bb = 10000;
+    if (aa / bb == 5) {
+        currentOutputStream->printf("gcc.asm division test passed: %llu / %llu = 5\n", aa, bb);
+    } else {
+        currentOutputStream->printf("gcc.asm division test failed: %llu / %llu != 5\n", aa, bb);
+    }
+
+    currentOutputStream->printf("========== gcc.asm test completed ==========\n");
+
 }
 
 void __kernelHeap_setup()
