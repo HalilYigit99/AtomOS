@@ -61,10 +61,11 @@ void __kernel_setup()
 
         int result = keyboardInputStream.readChar(&c);
 
-        currentOutputStream->printf("Read character finished with: %i\n", result);
-        if (c) currentOutputStream->printf("Key pressed: %c\n", c);
+        if (c != 'c') {
+            continue;
+        }
 
-        screenColor += 0x101010101;
+        screenColor += 0x32;
         __screen_fill(screenColor); // Change screen color
     }
 }
