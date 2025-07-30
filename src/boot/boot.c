@@ -9,11 +9,13 @@
 #include <intel86.h>
 #include <driver/Driver.h>
 #include <keyboard/Keyboard.h>
+#include <graphics/gfx.h>
 
 extern char __kernel_end; // End of kernel binary
 
 void __kernelHeap_setup();
 void __screen_fill(uint32_t color);
+void gfx_init();
 
 uint32_t screenColor = 0xFFFFFFFF; // Default screen color (white)
 
@@ -33,10 +35,10 @@ void __kernel_setup()
 
     currentOutputStream->printf("Kernel setup started...\n");
 
-    __screen_fill(0xFFFFFFFF); // Fill screen with white color
-
     // Setup kernel heap
     __kernelHeap_setup();
+
+    gfx_init(); // Initialize graphics subsystem
 
     currentOutputStream->printf("Kernel heap setup completed.\n");
 
@@ -48,26 +50,19 @@ void __kernel_setup()
 
     sys_driver_register(&ps2kbd_driver); // Register PS/2 keyboard driver
 
-    __screen_fill(screenColor);
+    __screen_fill(0);
 
-    while (1)
-    {
-        while (keyboardInputStream.available() == 0)
-        {
-            // Wait for keyboard input stream to be available
-        }
+    gfx_draw_line(screen_buffer, (gfx_line){
+        .start = {0, 0},
+        .end = {100, 100},
+        .color = {0xFF, 0xFF, 0xFF, 0xFF}, // Red color
+        .thickness = 1
+    });
 
-        char c;
+    gfx_draw_pixel(screen_buffer, (gfx_point){0, 0}, (gfx_color){0xFF, 0x00, 0xFF, 0xFF}); // Draw a red pixel at (0, 0)
 
-        int result = keyboardInputStream.readChar(&c);
+    gfx_draw_char(screen_buffer, (gfx_point){10, 10}, 'A', (gfx_color){0xFF, 0xFF, 0x00, 0xFF}); // Draw a red 'A' at (10, 10)
 
-        if (c != 'c') {
-            continue;
-        }
-
-        screenColor += 0x32;
-        __screen_fill(screenColor); // Change screen color
-    }
 }
 
 void __kernelHeap_setup()
