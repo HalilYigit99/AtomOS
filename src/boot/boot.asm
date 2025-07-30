@@ -5,7 +5,7 @@ global _start
 global mb2_tagptr
 extern intel86_setup
 extern __kernel_setup
-
+extern main
 extern __stack_start
 extern __stack_end
 
@@ -26,6 +26,10 @@ _start:
 
     ; Setup kernel heap and other kernel structures
     call __kernel_setup
+
+    push 0 ; Push argc (0 for now)
+    push 0 ; Push argv (NULL for now)
+    call main ; Call the main kernel function
 
 .halt:
     hlt

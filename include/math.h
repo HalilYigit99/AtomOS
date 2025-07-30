@@ -112,7 +112,6 @@ double frexp(double x, int *exp);
 float frexpf(float x, int *exp);
 double modf(double x, double *iptr);
 float modff(float x, float *iptr);
-double factorial(int n);
 
 // Fast approximations (useful for kernel/embedded)
 double fast_sin(double x);

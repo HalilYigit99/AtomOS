@@ -2,6 +2,19 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#ifndef NULL
+#define NULL ((void*)0)
+#endif
+
+// Math constants (in case header doesn't include them properly)
+#ifndef M_PI
+#define M_PI       3.14159265358979323846
+#define M_PI_2     1.57079632679489661923
+#define M_PI_4     0.78539816339744830962
+#define M_LN2      0.69314718055994530942
+#define M_LN10     2.30258509299404568402
+#endif
+
 // Basic arithmetic functions
 int abs(int x)
 {
@@ -26,6 +39,16 @@ double fabs(double x)
 float fabsf(float x)
 {
     return (x < 0.0f) ? -x : x;
+}
+
+// Helper function for Taylor series
+static double factorial(int n)
+{
+    if (n <= 1) return 1.0;
+    double result = 1.0;
+    for (int i = 2; i <= n; i++)
+        result *= i;
+    return result;
 }
 
 // Fast square root using bit manipulation (for float)
@@ -277,6 +300,130 @@ float tanf(float x)
     return (float)tan((double)x);
 }
 
+// Inverse trigonometric functions
+double asin(double x)
+{
+    if (x < -1.0 || x > 1.0) return NAN;
+    if (x == 0.0) return 0.0;
+    if (x == 1.0) return M_PI_2;
+    if (x == -1.0) return -M_PI_2;
+    
+    // Use Taylor series for small values
+    if (fabs(x) < 0.5) {
+        double result = x;
+        double term = x;
+        double x2 = x * x;
+        
+        for (int n = 1; n < 20; n++) {
+            term *= x2 * (2*n - 1) * (2*n - 1) / ((2*n) * (2*n + 1));
+            result += term;
+            if (fabs(term) < 1e-15) break;
+        }
+        return result;
+    }
+    
+    // For larger values, use identity: asin(x) = atan2(x, sqrt(1-x²))
+    return atan2(x, sqrt(1.0 - x * x));
+}
+
+float asinf(float x)
+{
+    return (float)asin((double)x);
+}
+
+double acos(double x)
+{
+    if (x < -1.0 || x > 1.0) return NAN;
+    return M_PI_2 - asin(x);
+}
+
+float acosf(float x)
+{
+    return (float)acos((double)x);
+}
+
+double atan(double x)
+{
+    if (x == 0.0) return 0.0;
+    if (x == 1.0) return M_PI_4;
+    if (x == -1.0) return -M_PI_4;
+    
+    // For small values, use Taylor series
+    if (fabs(x) < 0.5) {
+        double result = x;
+        double term = x;
+        double x2 = x * x;
+        
+        for (int n = 1; n < 50; n++) {
+            term *= -x2;
+            result += term / (2*n + 1);
+            if (fabs(term) < 1e-15) break;
+        }
+        return result;
+    }
+    
+    // For larger values, use identity: atan(x) = π/2 - atan(1/x) for x > 0
+    if (x > 1.0) return M_PI_2 - atan(1.0/x);
+    if (x < -1.0) return -M_PI_2 - atan(1.0/x);
+    
+    return atan(x); // Fallback
+}
+
+float atanf(float x)
+{
+    return (float)atan((double)x);
+}
+
+double atan2(double y, double x)
+{
+    if (x == 0.0 && y == 0.0) return 0.0;
+    if (x > 0.0) return atan(y/x);
+    if (x < 0.0 && y >= 0.0) return atan(y/x) + M_PI;
+    if (x < 0.0 && y < 0.0) return atan(y/x) - M_PI;
+    if (x == 0.0 && y > 0.0) return M_PI_2;
+    if (x == 0.0 && y < 0.0) return -M_PI_2;
+    return 0.0;
+}
+
+float atan2f(float y, float x)
+{
+    return (float)atan2((double)y, (double)x);
+}
+
+// Hyperbolic functions
+double sinh(double x)
+{
+    return (exp(x) - exp(-x)) / 2.0;
+}
+
+float sinhf(float x)
+{
+    return (float)sinh((double)x);
+}
+
+double cosh(double x)
+{
+    return (exp(x) + exp(-x)) / 2.0;
+}
+
+float coshf(float x)
+{
+    return (float)cosh((double)x);
+}
+
+double tanh(double x)
+{
+    if (x > 20.0) return 1.0;
+    if (x < -20.0) return -1.0;
+    double exp2x = exp(2.0 * x);
+    return (exp2x - 1.0) / (exp2x + 1.0);
+}
+
+float tanhf(float x)
+{
+    return (float)tanh((double)x);
+}
+
 // Rounding functions
 double floor(double x)
 {
@@ -341,6 +488,17 @@ float fmodf(float x, float y)
     return (float)fmod((double)x, (double)y);
 }
 
+double remainder(double x, double y)
+{
+    if (y == 0.0) return NAN;
+    return x - round(x/y) * y;
+}
+
+float remainderf(float x, float y)
+{
+    return (float)remainder((double)x, (double)y);
+}
+
 // Comparison functions
 double fmax(double x, double y)
 {
@@ -371,6 +529,61 @@ double copysign(double x, double y)
 float copysignf(float x, float y)
 {
     return (y >= 0.0f) ? fabsf(x) : -fabsf(x);
+}
+
+double ldexp(double x, int exp)
+{
+    return x * pow(2.0, (double)exp);
+}
+
+float ldexpf(float x, int exp)
+{
+    return (float)ldexp((double)x, exp);
+}
+
+double frexp(double x, int *exp)
+{
+    if (exp == NULL) return x;
+    if (x == 0.0) {
+        *exp = 0;
+        return 0.0;
+    }
+    
+    *exp = 0;
+    double abs_x = fabs(x);
+    
+    while (abs_x >= 2.0) {
+        abs_x /= 2.0;
+        (*exp)++;
+    }
+    while (abs_x < 1.0) {
+        abs_x *= 2.0;
+        (*exp)--;
+    }
+    
+    return (x < 0.0) ? -abs_x : abs_x;
+}
+
+float frexpf(float x, int *exp)
+{
+    double result = frexp((double)x, exp);
+    return (float)result;
+}
+
+double modf(double x, double *iptr)
+{
+    if (iptr == NULL) return x;
+    *iptr = trunc(x);
+    return x - *iptr;
+}
+
+float modff(float x, float *iptr)
+{
+    if (iptr == NULL) return x;
+    double int_part;
+    double frac_part = modf((double)x, &int_part);
+    *iptr = (float)int_part;
+    return (float)frac_part;
 }
 
 // Integer math utilities
@@ -419,16 +632,6 @@ uint32_t isqrt(uint32_t n)
     }
     
     return x;
-}
-
-// Helper function for Taylor series
-double factorial(int n)
-{
-    if (n <= 1) return 1.0;
-    double result = 1.0;
-    for (int i = 2; i <= n; i++)
-        result *= i;
-    return result;
 }
 
 // Classification functions (basic implementations)
