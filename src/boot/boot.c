@@ -5,11 +5,21 @@
 #include <memory/heap.h>
 #include <stream/OutputStream.h>
 #include <pci/pci.h>
+#include <convert.h>
+#include <intel86.h>
 
 extern char __kernel_end; // End of kernel binary
 
 void __kernelHeap_setup();
 void __screen_fill(uint32_t color);
+
+uint32_t screenColor = 0xFFFFFFFF; // Default screen color (white)
+
+void timer_handle() {
+    currentOutputStream->printf("Timer interrupt handled.\n");
+}
+
+void timer_isr();
 
 void __kernel_setup()
 {
@@ -30,9 +40,9 @@ void __kernel_setup()
 
     pci_init(); // Initialize PCI subsystem
 
-    currentOutputStream->printf("\n======= PCI Devices =======\n");
-    pci_print_all_devices();
-    currentOutputStream->printf("\n======= PCI Devices =======\n");
+    intel86_idt_set_entry(32, (uint32_t)timer_isr, 0x08, 0x8E); // Set timer ISR in IDT
+
+    pic_unmask(0);
 
 }
 

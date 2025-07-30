@@ -1,5 +1,7 @@
 #include "convert.h"
 
+#include <print.h>
+
 static const char digits[] = "0123456789abcdefghijklmnopqrstuvwxyz";
 static const char __attribute__((unused)) DIGITS[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
@@ -178,23 +180,7 @@ char* ultoa(unsigned long value, char* buffer, int base) {
 }
 
 char* ulltoa(unsigned long long value, char* buffer, int base) {
-    if (base < 2 || base > 36) {
-        *buffer = '\0';
-        return buffer;
-    }
-    
-    char* ptr = buffer;
-    int i = 0;
-    
-    do {
-        ptr[i++] = digits[value % base];
-        value /= base;
-    } while (value != 0);
-    
-    ptr[i] = '\0';
-    reverseString(ptr, i);
-    
-    return buffer;
+    return ultoa((unsigned long)value, buffer, base);
 }
 
 char* ptoa(void* ptr, char* buffer) {

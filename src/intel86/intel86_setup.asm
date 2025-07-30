@@ -4,6 +4,7 @@ global intel86_setup
 extern intel86_gdtr
 extern intel86_idt_init
 extern intel86_paging_init
+extern intel86_pic_init
 
 use32
 
@@ -26,6 +27,8 @@ intel86_setup_next:
     call intel86_idt_init  ; Initialize the Interrupt Descriptor Table (IDT)
 
     call intel86_paging_init  ; Initialize paging
+
+    call intel86_pic_init  ; Initialize the Programmable Interrupt Controller (PIC)
 
     ; Enable interrupts
     sti

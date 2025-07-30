@@ -18,7 +18,7 @@ typedef struct {
     int(*readBuffer)(void* buffer, size_t size);
 
     int(*available)();
-    int(*peek)();
+    char(*peek)();
     void(*flush)();
 
 } InputStream;
