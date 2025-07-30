@@ -6,7 +6,6 @@ extern timer_handle
 use32
 
 timer_isr:
-    cli                     ; Disable interrupts
     pushad                  ; Save all registers
     call timer_handle      ; Call the timer handler function
 
@@ -14,5 +13,4 @@ timer_isr:
     out 0x20, al  ; Master PIC EOI
 
     popad
-    sti
     iret                  ; Return from interrupt

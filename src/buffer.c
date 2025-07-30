@@ -82,9 +82,8 @@ int buffer_push_default(Buffer* buffer, const void* data) {
 }
 
 // Pop data from buffer (FIFO - front of queue)
-void* buffer_pop(Buffer* buffer, size_t* out_data_size) {
+void* buffer_pop(Buffer* buffer) {
     if (!buffer || buffer->count == 0) {
-        if (out_data_size) *out_data_size = 0;
         return NULL;
     }
     
@@ -101,24 +100,15 @@ void* buffer_pop(Buffer* buffer, size_t* out_data_size) {
     buffer->count--;
     buffer->total_size -= data_size;
     
-    if (out_data_size) {
-        *out_data_size = data_size;
-    }
-    
     // Not: Veri pointer'ını döndürüyoruz ama node'u silmiyoruz
     // Kullanıcı veriyi aldıktan sonra buffer_free_node() çağırmalı
     return data;
 }
 
 // Peek at front data without removing
-void* buffer_peek(Buffer* buffer, size_t* out_data_size) {
+void* buffer_peek(Buffer* buffer) {
     if (!buffer || buffer->count == 0) {
-        if (out_data_size) *out_data_size = 0;
         return NULL;
-    }
-    
-    if (out_data_size) {
-        *out_data_size = buffer->head->data_size;
     }
     
     return buffer->head->data;
@@ -132,6 +122,11 @@ size_t buffer_count(Buffer* buffer) {
 // Get total size of all data in buffer
 size_t buffer_total_size(Buffer* buffer) {
     return buffer ? buffer->total_size : 0;
+}
+
+// Get data size per element in buffer
+size_t buffer_data_size(Buffer* buffer) {
+    return buffer ? buffer->default_data_size : 0;
 }
 
 // Check if buffer is empty

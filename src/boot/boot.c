@@ -7,6 +7,8 @@
 #include <pci/pci.h>
 #include <convert.h>
 #include <intel86.h>
+#include <driver/Driver.h>
+#include <keyboard/Keyboard.h>
 
 extern char __kernel_end; // End of kernel binary
 
@@ -15,8 +17,8 @@ void __screen_fill(uint32_t color);
 
 uint32_t screenColor = 0xFFFFFFFF; // Default screen color (white)
 
-void timer_handle() {
-    currentOutputStream->printf("Timer interrupt handled.\n");
+void timer_handle()
+{
 }
 
 void timer_isr();
@@ -44,6 +46,27 @@ void __kernel_setup()
 
     pic_unmask(0);
 
+    sys_driver_register(&ps2kbd_driver); // Register PS/2 keyboard driver
+
+    __screen_fill(screenColor);
+
+    while (1)
+    {
+        while (keyboardInputStream.available() == 0)
+        {
+            // Wait for keyboard input stream to be available
+        }
+
+        char c;
+
+        int result = keyboardInputStream.readChar(&c);
+
+        currentOutputStream->printf("Read character finished with: %i\n", result);
+        if (c) currentOutputStream->printf("Key pressed: %c\n", c);
+
+        screenColor += 0x101010101;
+        __screen_fill(screenColor); // Change screen color
+    }
 }
 
 void __kernelHeap_setup()
@@ -52,52 +75,61 @@ void __kernelHeap_setup()
     if (!mb2_mmap)
     {
         // No memory map available, cannot setup heap
-        asm volatile ("cli; hlt"); // Halt the system
+        asm volatile("cli; hlt"); // Halt the system
     }
 
     size_t kernelEnd = (size_t)&__kernel_end;
 
-    heap_create(&kernel_heap, (void*)kernelEnd, (void*)(32 * 1024 * 1024)); // Create kernel heap
-
+    heap_create(&kernel_heap, (void *)kernelEnd, (void *)(32 * 1024 * 1024)); // Create kernel heap
 }
 
-void __screen_fill(uint32_t color) {
+void __screen_fill(uint32_t color)
+{
     // Check if framebuffer info is available
-    if (!mb2_framebuffer) {
+    if (!mb2_framebuffer)
+    {
         return;
     }
-    
+
     // Get framebuffer information
-    uint32_t* fb = (uint32_t*)(uintptr_t)mb2_framebuffer->framebuffer_addr;
+    uint32_t *fb = (uint32_t *)(uintptr_t)mb2_framebuffer->framebuffer_addr;
     uint32_t width = mb2_framebuffer->framebuffer_width;
     uint32_t height = mb2_framebuffer->framebuffer_height;
     uint32_t pitch = mb2_framebuffer->framebuffer_pitch;
     uint8_t bpp = mb2_framebuffer->framebuffer_bpp;
-    
+
     // Check framebuffer type (0 = indexed, 1 = RGB, 2 = EGA text)
-    if (mb2_framebuffer->framebuffer_type != 1) {
+    if (mb2_framebuffer->framebuffer_type != 1)
+    {
         return; // Only support RGB type
     }
-    
+
     // Fill the screen based on bits per pixel
-    if (bpp == 32) {
+    if (bpp == 32)
+    {
         // 32-bit color mode
-        for (uint32_t y = 0; y < height; y++) {
-            for (uint32_t x = 0; x < width; x++) {
+        for (uint32_t y = 0; y < height; y++)
+        {
+            for (uint32_t x = 0; x < width; x++)
+            {
                 // Calculate pixel position using pitch
                 uint32_t pixel_offset = (y * pitch + x * 4) / 4;
                 fb[pixel_offset] = color;
             }
         }
-    } else if (bpp == 24) {
+    }
+    else if (bpp == 24)
+    {
         // 24-bit color mode
-        uint8_t* fb8 = (uint8_t*)(uintptr_t)mb2_framebuffer->framebuffer_addr;
+        uint8_t *fb8 = (uint8_t *)(uintptr_t)mb2_framebuffer->framebuffer_addr;
         uint8_t r = (color >> 16) & 0xFF;
         uint8_t g = (color >> 8) & 0xFF;
         uint8_t b = color & 0xFF;
-        
-        for (uint32_t y = 0; y < height; y++) {
-            for (uint32_t x = 0; x < width; x++) {
+
+        for (uint32_t y = 0; y < height; y++)
+        {
+            for (uint32_t x = 0; x < width; x++)
+            {
                 uint32_t pixel_offset = y * pitch + x * 3;
                 fb8[pixel_offset] = b;     // Blue
                 fb8[pixel_offset + 1] = g; // Green

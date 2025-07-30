@@ -33,12 +33,13 @@ void buffer_clear(Buffer* buffer);
 // FIFO operations
 int buffer_push(Buffer* buffer, const void* data);
 int buffer_push_default(Buffer* buffer, const void* data);
-void* buffer_pop(Buffer* buffer, size_t* out_data_size);
-void* buffer_peek(Buffer* buffer, size_t* out_data_size);
+void* buffer_pop(Buffer* buffer);
+void* buffer_peek(Buffer* buffer);
 
 // Buffer information
 size_t buffer_count(Buffer* buffer);
 size_t buffer_total_size(Buffer* buffer);
+size_t buffer_data_size(Buffer* buffer);
 bool buffer_is_empty(Buffer* buffer);
 
 // Advanced operations

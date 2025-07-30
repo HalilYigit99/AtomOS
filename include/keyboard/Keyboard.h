@@ -10,7 +10,13 @@ extern "C" {
 
 #include <stream/InputStream.h>
 
-enum KeyboardKeys {
+typedef enum {
+    LAYOUT_US_QWERTY = 0, // US QWERTY layout ( default )
+    LAYOUT_TR_QWERTY, // Turkish QWERTY layout
+    LAYOUT_TR_F, // Turkish F layout
+} KeyboardLayouts;
+
+typedef enum {
     KEY_UNKNOWN = 0,
 
     // Letters
@@ -42,14 +48,14 @@ enum KeyboardKeys {
     
     // System keys
     KEY_PRINT_SCREEN, KEY_SCROLL_LOCK, KEY_PAUSE, KEY_MENU, KEY_WINDOWS
-};
+} KeyboardKeys;
 
 typedef struct {
     char ascii;        // ASCII character
-    enum KeyboardKeys key; // Enum value representing the key
+    KeyboardKeys key; // Enum value representing the key
     bool isPressed;    // Whether the key is pressed
     union {
-        bool leftShift;   // Left Shift key state
+        bool left;   // Left Shift key state
         bool upperCase;  // Uppercase state for letters
     };
 } KeyboardKeyEventData;

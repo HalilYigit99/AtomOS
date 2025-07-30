@@ -21,6 +21,8 @@ typedef struct {
 void sys_driver_register(Driver* driver);
 void sys_driver_unregister(Driver* driver);
 
+extern Driver ps2kbd_driver; // PS/2 keyboard driver instance
+
 #ifdef __cplusplus
 }
 #endif

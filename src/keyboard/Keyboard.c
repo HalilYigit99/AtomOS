@@ -1,9 +1,14 @@
 #include <keyboard/Keyboard.h>
 #include <list.h>
+#include <print.h>
+
+KeyboardLayouts currentLayout = LAYOUT_US_QWERTY; // Default keyboard layout
 
 List* keyboardInputStreamList = NULL; // Global list to hold keyboard input streams given from drivers
 
 static bool isOpen = false; // Flag to check if the keyboard input stream is open
+
+bool __kbd_abstraction_initialized;
 
 static int __open();
 static void __close();
@@ -37,6 +42,7 @@ static int __open() {
     }
 
     isOpen = true; // Set the open flag
+    __kbd_abstraction_initialized = true; // Set the keyboard abstraction layer initialized flag
 
     return 0; // Return 0 on success
 }
@@ -51,6 +57,8 @@ static void __close() {
     list_destroy_with_data(keyboardInputStreamList, NULL); // Destroy the list and free its resources
 
     keyboardInputStreamList = NULL; // Set the list to NULL
+
+    __kbd_abstraction_initialized = false; // Reset the keyboard abstraction layer initialized flag
 
 }
 
