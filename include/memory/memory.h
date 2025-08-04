@@ -53,6 +53,9 @@ int safe_memcpy(void* dest, size_t dest_size, const void* src, size_t src_size);
 int safe_memmove(void* dest, size_t dest_size, const void* src, size_t src_size);
 
 void* kmalloc(size_t size);
+void* kcalloc(size_t num, size_t size);
+void* krealloc(void* ptr, size_t new_size);
+void* kmalloc_aligned(size_t size, size_t alignment);
 void kfree(void* ptr);
 
 #ifdef __cplusplus

@@ -13,6 +13,7 @@ iso: kernel.elf
 	@mkdir -p $(ISO_DIR)/boot/grub
 	@cp kernel.elf $(ISO_DIR)/boot/
 	@cp $(SCRIPTS_DIR)/grub.cfg $(ISO_DIR)/boot/grub/
-	grub-mkrescue -o AtomOS.iso $(ISO_DIR)
+	@grub-mkrescue -o AtomOS.iso $(ISO_DIR)
+
 	@echo "ISO oluşturuldu: AtomOS.iso"
 	@cp AtomOS.iso /mnt/c/users/halil/desktop

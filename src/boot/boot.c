@@ -15,6 +15,8 @@ extern char __kernel_end; // End of kernel binary
 void __kernelHeap_setup();
 void __screen_fill(uint32_t color);
 
+void terminal_init();
+
 void timer_handle()
 {
     // Timer interrupt handler
@@ -39,6 +41,9 @@ void __kernel_setup()
     // Initialize PCI subsystem
     pci_init();
 
+    // Initialize terminal
+    terminal_init();
+
     // Setup timer interrupt (IRQ0 -> INT 32)
     intel86_idt_set_entry(32, (uint32_t)timer_isr, 0x08, 0x8E);
     pic_unmask(0);
@@ -59,5 +64,5 @@ void __kernelHeap_setup()
     size_t kernelEnd = (size_t)&__kernel_end;
     
     // Create kernel heap (32MB heap space)
-    heap_create(&kernel_heap, (void*)kernelEnd, (void*)(32 * 1024 * 1024));
+    heap_create(&kernel_heap, (void*)kernelEnd, (void*)(64 * 1024 * 1024));
 }

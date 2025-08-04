@@ -306,6 +306,103 @@ bool pci_bar_is_prefetchable(pci_device_t* dev, uint8_t bar_num) {
     return false;
 }
 
+// PCI BAR I/O Operations
+void pci_bar_write8(pci_device_t* dev, uint8_t bar_num, uint32_t offset, uint8_t value) {
+    if (bar_num >= 6) return;
+    
+    uint32_t bar_addr = pci_get_bar_address(dev, bar_num);
+    if (bar_addr == 0) return;
+    
+    if (pci_bar_is_io(dev, bar_num)) {
+        // I/O BAR - use port I/O
+        outb(bar_addr + offset, value);
+    } else {
+        // Memory BAR - use memory mapped I/O
+        volatile uint8_t* mem_addr = (volatile uint8_t*)(bar_addr + offset);
+        *mem_addr = value;
+    }
+}
+
+void pci_bar_write16(pci_device_t* dev, uint8_t bar_num, uint32_t offset, uint16_t value) {
+    if (bar_num >= 6) return;
+    
+    uint32_t bar_addr = pci_get_bar_address(dev, bar_num);
+    if (bar_addr == 0) return;
+    
+    if (pci_bar_is_io(dev, bar_num)) {
+        // I/O BAR - use port I/O
+        outw(bar_addr + offset, value);
+    } else {
+        // Memory BAR - use memory mapped I/O
+        volatile uint16_t* mem_addr = (volatile uint16_t*)(bar_addr + offset);
+        *mem_addr = value;
+    }
+}
+
+void pci_bar_write32(pci_device_t* dev, uint8_t bar_num, uint32_t offset, uint32_t value) {
+    if (bar_num >= 6) return;
+    
+    uint32_t bar_addr = pci_get_bar_address(dev, bar_num);
+    if (bar_addr == 0) return;
+    
+    if (pci_bar_is_io(dev, bar_num)) {
+        // I/O BAR - use port I/O
+        outl(bar_addr + offset, value);
+    } else {
+        // Memory BAR - use memory mapped I/O
+        volatile uint32_t* mem_addr = (volatile uint32_t*)(bar_addr + offset);
+        *mem_addr = value;
+    }
+}
+
+uint8_t pci_bar_read8(pci_device_t* dev, uint8_t bar_num, uint32_t offset) {
+    if (bar_num >= 6) return 0;
+    
+    uint32_t bar_addr = pci_get_bar_address(dev, bar_num);
+    if (bar_addr == 0) return 0;
+    
+    if (pci_bar_is_io(dev, bar_num)) {
+        // I/O BAR - use port I/O
+        return inb(bar_addr + offset);
+    } else {
+        // Memory BAR - use memory mapped I/O
+        volatile uint8_t* mem_addr = (volatile uint8_t*)(bar_addr + offset);
+        return *mem_addr;
+    }
+}
+
+uint16_t pci_bar_read16(pci_device_t* dev, uint8_t bar_num, uint32_t offset) {
+    if (bar_num >= 6) return 0;
+    
+    uint32_t bar_addr = pci_get_bar_address(dev, bar_num);
+    if (bar_addr == 0) return 0;
+    
+    if (pci_bar_is_io(dev, bar_num)) {
+        // I/O BAR - use port I/O
+        return inw(bar_addr + offset);
+    } else {
+        // Memory BAR - use memory mapped I/O
+        volatile uint16_t* mem_addr = (volatile uint16_t*)(bar_addr + offset);
+        return *mem_addr;
+    }
+}
+
+uint32_t pci_bar_read32(pci_device_t* dev, uint8_t bar_num, uint32_t offset) {
+    if (bar_num >= 6) return 0;
+    
+    uint32_t bar_addr = pci_get_bar_address(dev, bar_num);
+    if (bar_addr == 0) return 0;
+    
+    if (pci_bar_is_io(dev, bar_num)) {
+        // I/O BAR - use port I/O
+        return inl(bar_addr + offset);
+    } else {
+        // Memory BAR - use memory mapped I/O
+        volatile uint32_t* mem_addr = (volatile uint32_t*)(bar_addr + offset);
+        return *mem_addr;
+    }
+}
+
 // Driver management
 void pci_register_driver(pci_driver_t* driver) {
     if (!driver) return;

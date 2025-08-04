@@ -146,6 +146,14 @@ bool pci_bar_is_memory(pci_device_t *dev, uint8_t bar_num);
 bool pci_bar_is_64bit(pci_device_t *dev, uint8_t bar_num);
 bool pci_bar_is_prefetchable(pci_device_t *dev, uint8_t bar_num);
 
+// PCI BAR I/O Operations
+void pci_bar_write8(pci_device_t *dev, uint8_t bar_num, uint32_t offset, uint8_t value);
+void pci_bar_write16(pci_device_t *dev, uint8_t bar_num, uint32_t offset, uint16_t value);
+void pci_bar_write32(pci_device_t *dev, uint8_t bar_num, uint32_t offset, uint32_t value);
+uint8_t pci_bar_read8(pci_device_t *dev, uint8_t bar_num, uint32_t offset);
+uint16_t pci_bar_read16(pci_device_t *dev, uint8_t bar_num, uint32_t offset);
+uint32_t pci_bar_read32(pci_device_t *dev, uint8_t bar_num, uint32_t offset);
+
 // PCI Driver Management
 void pci_register_driver(pci_driver_t *driver);
 void pci_unregister_driver(pci_driver_t *driver);

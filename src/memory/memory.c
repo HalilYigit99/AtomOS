@@ -421,3 +421,25 @@ void kfree(void* ptr) {
     // Free memory back to the kernel heap
     heap_free(&kernel_heap, ptr);
 }
+
+void* kcalloc(size_t num, size_t size) {
+    return heap_calloc(&kernel_heap, num, size);
+}
+
+void* krealloc(void* ptr, size_t new_size) {
+    return heap_realloc(&kernel_heap, ptr, new_size);
+}
+
+void* kmalloc_aligned(size_t size, size_t alignment) {
+    if (size == 0 || alignment == 0) {
+        return NULL; // Invalid size or alignment
+    }
+
+    if (alignment == 1) {
+        return heap_alloc(&kernel_heap, size); // No alignment needed
+    }
+
+    // Allocate memory aligned
+    return heap_alloc_aligned(&kernel_heap, size, alignment);
+
+}
