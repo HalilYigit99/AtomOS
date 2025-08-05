@@ -21,10 +21,10 @@ typedef struct {
 typedef union {
     uint32_t argb;
     struct {
-        uint8_t a; // Alpha
-        uint8_t r; // Red
-        uint8_t g; // Green
         uint8_t b; // Blue
+        uint8_t g; // Green
+        uint8_t r; // Red
+        uint8_t a; // Alpha
     };
 } gfx_color;
 
@@ -35,7 +35,7 @@ typedef struct {
 } gfx_rect;
 
 typedef struct {
-    gfx_size radius;
+    size_t radius;
     gfx_point position;
     gfx_color color;
 } gfx_circle;
@@ -74,31 +74,8 @@ extern gfx_font* default_font; // Global default font
 extern gfx_font gfx_font8x8; // 8x8 bitmap font
 extern gfx_font gfx_font8x16; // 8x16 bitmap font
 
-// Graphics initialization
-void gfx_init(void);
-
-// Buffer management
-gfx_buffer* gfx_create_buffer(size_t width, size_t height);
-
-// Basic drawing functions
-void gfx_draw_pixel(gfx_buffer* buffer, gfx_point position, gfx_color color);
-void gfx_draw_line(gfx_buffer* buffer, gfx_line line);
-void gfx_draw_rect(gfx_buffer* buffer, gfx_rect rect, gfx_color color);
-void gfx_fill_rect(gfx_buffer* buffer, gfx_rect rect, gfx_color color);
-void gfx_draw_circle(gfx_buffer* buffer, gfx_circle circle);
-void gfx_clear(gfx_buffer* buffer, gfx_color color);
-void gfx_copy(gfx_buffer* src, gfx_buffer* dest, gfx_point src_pos, gfx_point dest_pos, gfx_size size);
-
-// Text rendering functions using default font
-void gfx_draw_char(gfx_buffer* buffer, gfx_point position, char character, gfx_color color, gfx_font* font);
-void gfx_draw_text(gfx_buffer* buffer, gfx_point position, const char* text, gfx_color color, gfx_font* font);
-
-// Generic character drawing function with callback
-void VDrawChar(char c, gfx_font* font, gfx_point point, void(*drawPixelHandle)(size_t x, size_t y, gfx_color color));
-
-
-// Draws all graphics buffers to the screen
-void gfx_draw();
+gfx_buffer* gfx_create_buffer(gfx_size size);
+void gfx_delete_buffer(gfx_buffer* buffer);
 
 #ifdef __cplusplus
 }

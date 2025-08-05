@@ -36,7 +36,7 @@ void __kernel_setup()
     __kernelHeap_setup();
 
     // Initialize graphics subsystem
-    gfx_init();
+    // gfx_init();
 
     // Initialize PCI subsystem
     pci_init();
