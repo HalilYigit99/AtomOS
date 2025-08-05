@@ -51,6 +51,7 @@ typedef struct {
     gfx_size size;
     void* buffer; // Pointer to the pixel buffer
     uint32_t bpp; // Bits per pixel
+    uint32_t drawBeginLineIndex; // Index of the first line to draw
 } gfx_buffer;
 
 typedef enum {
@@ -76,6 +77,16 @@ extern gfx_font gfx_font8x16; // 8x16 bitmap font
 
 gfx_buffer* gfx_create_buffer(gfx_size size);
 void gfx_delete_buffer(gfx_buffer* buffer);
+
+// Çizme yardımcısı fonksiyonları
+void VDrawPixel(gfx_buffer* buffer, size_t x, size_t y, gfx_color color);
+void VDrawChar(char c, gfx_font* font, gfx_point point, void(*drawPixelHandle)(size_t x, size_t y, gfx_color color));
+void VDrawCircle(gfx_circle circle, void(*drawPixelHandle)(size_t x, size_t y, gfx_color color));
+void VDrawRect(gfx_rect rect, void(*drawPixelHandle)(size_t x, size_t y, gfx_color color));
+void VFillRect(gfx_rect rect, void(*drawPixelHandle)(size_t x, size_t y, gfx_color color));
+void VFillCircle(gfx_circle circle, void(*drawPixelHandle)(size_t x, size_t y, gfx_color color));
+void VFillScreen(gfx_buffer *buffer, gfx_color color);
+void VDrawString(gfx_buffer *buffer, gfx_point position, const char *string, gfx_color color, gfx_font *font);
 
 #ifdef __cplusplus
 }

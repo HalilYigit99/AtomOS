@@ -44,8 +44,8 @@ void VDrawChar(char c, gfx_font* font, gfx_point point, void(*drawPixelHandle)(s
     for (int y = 0; y < char_height; y++) {
         unsigned char row_data = char_data[y];
         for (int x = 0; x < char_width; x++) {
-            // Bit set ise pixel çiz (MSB'den başlayarak, 7-x ile bit sırasını kontrol et)
-            if (row_data & (1 << (7 - x))) {
+            // Font genişliğine göre dinamik bit kontrolü (MSB first format)
+            if (row_data & (1 << (char_width - 1 - x))) {
                 // DÜZELTME: Artık callback'den renk alacağımız için beyaz yerine 
                 // callback'in kendisinin rengi belirlemesine izin ver
                 gfx_color foreground_color = {.argb = 0xFFFFFFFF}; // Varsayılan beyaz

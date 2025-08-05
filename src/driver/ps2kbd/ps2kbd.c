@@ -251,8 +251,6 @@ void ps2kbd_handler() {
         return; // No buffer
     }
 
-    currentOutputStream->printf("PS/2 keyboard handler called.\n");
-
     char scancode = inb(0x60); // Read scancode from PS/2 keyboard
 
     if (currentLayout == LAYOUT_US_QWERTY) {

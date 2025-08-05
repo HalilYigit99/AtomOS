@@ -14,15 +14,8 @@ extern char __kernel_end; // End of kernel binary
 
 void __kernelHeap_setup();
 void __screen_fill(uint32_t color);
-
+void gfx_init();
 void terminal_init();
-
-void timer_handle()
-{
-    // Timer interrupt handler
-}
-
-void timer_isr();
 
 void __kernel_setup()
 {
@@ -35,18 +28,14 @@ void __kernel_setup()
     // Setup kernel heap
     __kernelHeap_setup();
 
-    // Initialize graphics subsystem
-    // gfx_init();
-
-    // Initialize PCI subsystem
-    pci_init();
+    // GFX initialization
+    gfx_init();
 
     // Initialize terminal
     terminal_init();
 
-    // Setup timer interrupt (IRQ0 -> INT 32)
-    intel86_idt_set_entry(32, (uint32_t)timer_isr, 0x08, 0x8E);
-    pic_unmask(0);
+    // Initialize PCI subsystem
+    pci_init();
 
     // Register PS/2 keyboard driver
     sys_driver_register(&ps2kbd_driver);
