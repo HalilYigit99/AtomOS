@@ -37,6 +37,8 @@ _start:
 
 .ret:
     ; If the magic number is incorrect, halt the CPU
+    cli
+    hlt
     ret
 
 

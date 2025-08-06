@@ -13,26 +13,29 @@
 extern char __kernel_end; // End of kernel binary
 
 void __kernelHeap_setup();
-void __screen_fill(uint32_t color);
 void gfx_init();
-void terminal_init();
 
 void __kernel_setup()
 {
     // Initialize output stream
     currentOutputStream->Open();
 
+    currentOutputStream->printf("Kernel setup started...\n");
+
     // Parse multiboot2 tags first
     multiboot2_parse();
+
+    currentOutputStream->printf("Multiboot2 tags parsed successfully.\n");
 
     // Setup kernel heap
     __kernelHeap_setup();
 
-    // GFX initialization
+    currentOutputStream->printf("Kernel heap setup completed.\n");
+
+    // Setup gfx subsystem
     gfx_init();
 
-    // Initialize terminal
-    terminal_init();
+    currentOutputStream->printf("Graphics subsystem initialized.\n");
 
     // Initialize PCI subsystem
     pci_init();

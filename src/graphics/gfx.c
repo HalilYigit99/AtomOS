@@ -1,107 +1,355 @@
 #include <graphics/gfx.h>
-#include <boot/multiboot2.h>
-#include <stream/OutputStream.h>
 #include <list.h>
 #include <memory/memory.h>
+#include <boot/multiboot2.h>
 #include <task/PeriodicTask.h>
+#include <stream/OutputStream.h>
+#include <math.h>
+
+static volatile size_t screen_width;
+static volatile size_t screen_height;
 
 List* gfx_buffers;
 
+gfx_buffer* hardware_buffer;
 gfx_buffer* screen_buffer;
-gfx_buffer* hardwareBuffer;
 
-PeriodicTask* gfx_drawBufferTask;
+static PeriodicTask* gfx_task;
 
-void gfx_draw();
+static void gfx_draw_task();
 
-void __attribute__((optimize("O0"))) gfx_init() {
-    if (!gfx_buffers) {
-        gfx_buffers = list_create();
+void  gfx_init() {
 
-        if (!gfx_buffers) {
-            currentOutputStream->printf("Failed to initialize graphics buffers list.\n");
-            return; // Initialization failed
-        }
+    screen_height = mb2_framebuffer->framebuffer_height;
+    screen_width = mb2_framebuffer->framebuffer_width;
 
-        screen_buffer = gfx_create_buffer((gfx_size){800, 600}); // Default screen size and 32 bpp
+    // Initialize hardware buffer
+    hardware_buffer = (gfx_buffer*)kmalloc(sizeof(gfx_buffer));
 
+    if (!hardware_buffer) {
+        currentOutputStream->printf("Failed to allocate hardware buffer\n");
+        asm volatile("cli; hlt"); // Halt the system
     }
 
-    hardwareBuffer = (gfx_buffer*)kmalloc(sizeof(gfx_buffer));
+    hardware_buffer->size.width = screen_width;
+    hardware_buffer->size.height = screen_height;
 
-    hardwareBuffer->size.width = mb2_framebuffer->framebuffer_width;
-    hardwareBuffer->size.height = mb2_framebuffer->framebuffer_height;
-    hardwareBuffer->bpp = mb2_framebuffer->framebuffer_bpp;
-    hardwareBuffer->drawBeginLineIndex = 0; // Start drawing from the first line
-    hardwareBuffer->buffer = (uint32_t)mb2_framebuffer->framebuffer_addr; // Use the framebuffer address directly
+    size_t fb_addr = (size_t)mb2_framebuffer->framebuffer_addr;
 
-    gfx_drawBufferTask = createPeriodicTask((uint32_t)(uintptr_t)gfx_draw, 100); // 10 FPS
-    startPeriodicTask(gfx_drawBufferTask);
+    hardware_buffer->buffer = (void*)fb_addr;
+    hardware_buffer->bpp = mb2_framebuffer->framebuffer_bpp;
+    hardware_buffer->drawBeginLineIndex = 0;
+
+    gfx_buffers = list_create();
+
+    if (!gfx_buffers)
+    {
+        currentOutputStream->printf("Failed to create graphics buffer list\n");
+        asm volatile("cli; hlt"); // Halt the system
+    }
+
+    // Initialize screen buffer
+    screen_buffer = gfx_create_buffer();
+    gfx_clear_buffer(screen_buffer, (gfx_color){ .argb = 0xFF000000 }); // Clear screen to black
+
+    gfx_task = createPeriodicTask((uint32_t)gfx_draw_task, 100); // 10 FPS
+    startPeriodicTask(gfx_task);
 
 }
 
-gfx_buffer* gfx_create_buffer(gfx_size size) {
+gfx_buffer*  gfx_create_buffer() 
+{
+    if (!gfx_buffers) {
+        currentOutputStream->printf("[ERROR] Graphics buffers list is not initialized\n");
+        asm volatile("cli; hlt"); // Halt the system
+    }
+
     gfx_buffer* buffer = (gfx_buffer*)kmalloc(sizeof(gfx_buffer));
     if (!buffer) {
-        currentOutputStream->printf("Failed to allocate memory for graphics buffer.\n");
-        return NULL; // Memory allocation failed
+        currentOutputStream->printf("Failed to allocate graphics buffer\n");
+        asm volatile("cli; hlt"); // Halt the system
     }
 
-    buffer->size = size;
-    buffer->drawBeginLineIndex = 0; // Default to start drawing from the first line
-    buffer->bpp = 32; // Default to 32 bits per pixel
-    buffer->buffer = kmalloc(size.width * size.height * (buffer->bpp / 8)); // Allocate pixel buffer
-
+    buffer->size.width = screen_width;
+    buffer->size.height = screen_height;
+    buffer->buffer = kmalloc(screen_width * screen_height * sizeof(uint32_t)); // Assuming 32 bits per pixel
+    
     if (!buffer->buffer) {
-        currentOutputStream->printf("Failed to allocate pixel buffer for graphics buffer.\n");
-        kfree(buffer);
-        return NULL; // Memory allocation failed
+        currentOutputStream->printf("Failed to allocate buffer memory\n");
+        asm volatile ("cli; hlt"); // Halt the system
     }
 
-    list_add(gfx_buffers, buffer); // Add the new buffer to the list
+    buffer->bpp = 32; // Assuming 32 bits per pixel
+    buffer->drawBeginLineIndex = 0;
+
+    list_add(gfx_buffers, buffer);
+
     return buffer;
+
 }
 
 void gfx_destroy_buffer(gfx_buffer* buffer) {
-    if (!buffer) {
-        return; // Nothing to destroy
-    }
+    if (!buffer) return;
 
-    if (buffer->buffer) {
-        kfree(buffer->buffer); // Free the pixel buffer
-    }
-
-    list_remove(gfx_buffers, buffer); // Remove from the list
-    kfree(buffer); // Free the gfx_buffer structure
+    kfree(buffer->buffer);
+    kfree(buffer);
+    
+    // Remove from the list
+    list_remove(gfx_buffers, buffer);
 }
 
-void gfx_draw() {
+void  gfx_draw_pixel(gfx_buffer* buffer, int x, int y, gfx_color color)
+{
+    if (!buffer || x >= buffer->size.width || y >= buffer->size.height) return;
 
-    if (!gfx_buffers || !screen_buffer) {
-        currentOutputStream->printf("[ERROR] Graphics buffers not initialized.\n");
-        return; // No buffers to draw
+    volatile gfx_color* pixel = (volatile gfx_color*)((size_t)buffer->buffer + (y * buffer->size.width + x) * sizeof(uint32_t));
+    pixel->argb = color.argb;
+
+}
+
+void gfx_draw_line(gfx_buffer* buffer, int x1, int y1, int x2, int y2, gfx_color color) {
+    if (!buffer) return;
+
+    int dx = abs(x2 - x1);
+    int dy = abs(y2 - y1);
+    int sx = (x1 < x2) ? 1 : -1;
+    int sy = (y1 < y2) ? 1 : -1;
+    int err = dx - dy;
+
+    while (true) {
+        gfx_draw_pixel(buffer, x1, y1, color);
+        if (x1 == x2 && y1 == y2) break;
+        int err2 = err * 2;
+        if (err2 > -dy) {
+            err -= dy;
+            x1 += sx;
+        }
+        if (err2 < dx) {
+            err += dx;
+            y1 += sy;
+        }
+    }
+}
+
+void gfx_draw_rectangle(gfx_buffer* buffer, int x, int y, int width, int height, gfx_color color) {
+    if (!buffer) return;
+
+    gfx_draw_line(buffer, x, y, x + width - 1, y, color);
+    gfx_draw_line(buffer, x + width - 1, y, x + width - 1, y + height - 1, color);
+    gfx_draw_line(buffer, x + width - 1, y + height - 1, x, y + height - 1, color);
+    gfx_draw_line(buffer, x, y + height - 1, x, y, color);
+}
+
+void gfx_fill_rectangle(gfx_buffer* buffer, int x, int y, int width, int height, gfx_color color) {
+    if (!buffer) return;
+
+    for (int i = 0; i < height; i++) {
+        for (int j = 0; j < width; j++) {
+            gfx_draw_pixel(buffer, x + j, y + i, color);
+        }
+    }
+}
+
+void gfx_draw_circle(gfx_buffer* buffer, int x, int y, int radius, gfx_color color) {
+    if (!buffer || radius <= 0) return;
+
+    int f = 1 - radius;
+    int ddF_x = 1;
+    int ddF_y = -2 * radius;
+    int x1 = 0;
+    int y1 = radius;
+
+    gfx_draw_pixel(buffer, x, y + radius, color);
+    gfx_draw_pixel(buffer, x, y - radius, color);
+    gfx_draw_pixel(buffer, x + radius, y, color);
+    gfx_draw_pixel(buffer, x - radius, y, color);
+
+    while (x1 < y1) {
+        if (f >= 0) {
+            y1--;
+            ddF_y += 2;
+            f += ddF_y;
+        }
+        x1++;
+        ddF_x += 2;
+        f += ddF_x;
+
+        gfx_draw_pixel(buffer, x + x1, y + y1, color);
+        gfx_draw_pixel(buffer, x - x1, y + y1, color);
+        gfx_draw_pixel(buffer, x + x1, y - y1, color);
+        gfx_draw_pixel(buffer, x - x1, y - y1, color);
+        gfx_draw_pixel(buffer, x + y1, y + x1, color);
+        gfx_draw_pixel(buffer, x - y1, y + x1, color);
+        gfx_draw_pixel(buffer, x + y1, y - x1, color);
+        gfx_draw_pixel(buffer, x - y1, y - x1, color);
+    }
+}
+
+void gfx_fill_circle(gfx_buffer* buffer, int x, int y, int radius, gfx_color color) {
+    if (!buffer || radius <= 0) return;
+
+    int f = 1 - radius;
+    int ddF_x = 1;
+    int ddF_y = -2 * radius;
+    int x1 = 0;
+    int y1 = radius;
+
+    for (int i = -radius; i <= radius; i++) {
+        gfx_draw_pixel(buffer, x + i, y + radius, color);
+        gfx_draw_pixel(buffer, x + i, y - radius, color);
     }
 
-    if (list_size(gfx_buffers) == 0) {
-        return; // Nothing to draw
+    while (x1 < y1) {
+        if (f >= 0) {
+            y1--;
+            ddF_y += 2;
+            f += ddF_y;
+        }
+        x1++;
+        ddF_x += 2;
+        f += ddF_x;
+
+        for (int i = -x1; i <= x1; i++) {
+            gfx_draw_pixel(buffer, x + i, y + y1, color);
+            gfx_draw_pixel(buffer, x + i, y - y1, color);
+        }
+        for (int i = -y1; i <= y1; i++) {
+            gfx_draw_pixel(buffer, x + x1, y + i, color);
+            gfx_draw_pixel(buffer, x - x1, y + i, color);
+        }
+    }
+}
+
+void gfx_draw_triangle(gfx_buffer* buffer, int x1, int y1, int x2, int y2, int x3, int y3, gfx_color color) {
+    if (!buffer) return;
+
+    gfx_draw_line(buffer, x1, y1, x2, y2, color);
+    gfx_draw_line(buffer, x2, y2, x3, y3, color);
+    gfx_draw_line(buffer, x3, y3, x1, y1, color);
+}
+
+void gfx_fill_triangle(gfx_buffer* buffer, int x1, int y1, int x2, int y2, int x3, int y3, gfx_color color) {
+    if (!buffer) return;
+
+    // Sort vertices by y-coordinate
+    if (y1 > y2) { int tmp = y1; y1 = y2; y2 = tmp; tmp = x1; x1 = x2; x2 = tmp; }
+    if (y1 > y3) { int tmp = y1; y1 = y3; y3 = tmp; tmp = x1; x1 = x3; x3 = tmp; }
+    if (y2 > y3) { int tmp = y2; y2 = y3; y3 = tmp; tmp = x2; x2 = x3; x3 = tmp; }
+
+    // Calculate the area of the triangle
+    float area = 0.5f * (-x2 * y3 + x1 * (-y2 + y3) + x2 * (y1 - y3) + x3 * (y2 - y1));
+
+    for (int i = 0; i <= area; i++) {
+        float alpha = (float)i / area;
+        float beta = (float)(area - i) / area;
+
+        int px = (int)(x1 * alpha + x2 * beta);
+        int py = (int)(y1 * alpha + y2 * beta);
+
+        gfx_draw_pixel(buffer, px, py, color);
+    }
+}
+
+void gfx_draw_char(gfx_buffer* buffer, int x, int y, char c, gfx_color color, gfx_font* font) {
+    if (!buffer || !font || x < 0 || y < 0) return;
+
+    // Buffer sınırlarını kontrol et
+    if (x + font->size.width > buffer->size.width || y + font->size.height > buffer->size.height) {
+        return;
     }
 
-    // Iterate through all buffers and draw them
-    ListNode* node = gfx_buffers->head;
-    while (node) {
-        gfx_buffer* buffer = (gfx_buffer*)node->data;
-        if (buffer && buffer->buffer) {
-            // Draw the buffer to the screen
-            for (size_t y = 0; y < buffer->size.height; y++) {
-                for (size_t x = 0; x < buffer->size.width; x++) {
-                    VDrawPixel(hardwareBuffer, x, y, *(gfx_color*)(buffer->buffer + (y * buffer->size.width + x) * 4));
+    // Karakter indeksini hesapla (ASCII değeri olarak)
+    unsigned char char_index = (unsigned char)c;
+    if (char_index > 127) return; // Şimdilik sadece ASCII karakterleri destekleniyor
+
+    switch (font->type) {
+        case GFX_FONT_BITMAP: {
+            // Font verisini unsigned char* olarak cast et
+            unsigned char (*bitmap_font)[font->size.height] = (unsigned char (*)[font->size.height])font->glyphs;
+            
+            // Her satır için
+            for (int row = 0; row < font->size.height; row++) {
+                unsigned char bitmap_row = bitmap_font[char_index][row];
+                
+                // Her bit için (MSB solda, LSB sağda)
+                for (int col = 0; col < font->size.width; col++) {
+                    // MSB'den başlayarak bit kontrol et (7, 6, 5, 4, 3, 2, 1, 0)
+                    if (bitmap_row & (1 << (font->size.width - 1 - col))) {
+                        gfx_draw_pixel(buffer, x + col, y + row, color);
+                    }
                 }
             }
+            break;
         }
-        node = node->next;
+        
+        case GFX_FONT_VECTOR:
+            // TODO: Vector font desteği eklenecek
+            break;
+            
+        case GFX_FONT_PSF:
+            // TODO: PostScript font desteği eklenecek
+            break;
+            
+        case GFX_FONT_TTF:
+            // TODO: TrueType font desteği eklenecek
+            break;
+            
+        case GFX_FONT_OTF:
+            // TODO: OpenType font desteği eklenecek
+            break;
+            
+        default:
+            // Bilinmeyen font tipi, hiçbir şey yapma
+            break;
+    }
+}
+
+void gfx_draw_text(gfx_buffer* buffer, int x, int y, char* text, gfx_color color, gfx_font* font) {
+    if (!buffer || !text || !font || x < 0 || y < 0) return;
+
+    for (int i = 0; text[i] != '\0'; i++) {
+        gfx_draw_char(buffer, x + i * font->size.width, y, text[i], color, font);
+    }
+}
+
+void gfx_draw_bitmap(gfx_buffer* buffer, int x, int y, void* bitmap, size_t width, size_t height) {
+    if (!buffer || !bitmap || x < 0 || y < 0 || x + width > buffer->size.width || y + height > buffer->size.height) return;
+
+    gfx_color* src = (gfx_color*)bitmap;
+    for (size_t j = 0; j < height; j++) {
+        for (size_t i = 0; i < width; i++) {
+            gfx_draw_pixel(buffer, x + i, y + j, src[j * width + i]);
+        }
+    }
+}
+
+void gfx_clear_buffer(gfx_buffer* buffer, gfx_color color) {
+    if (!buffer) return;
+
+    for (size_t y = 0; y < buffer->size.height; y++) {
+        for (size_t x = 0; x < buffer->size.width; x++) {
+            gfx_draw_pixel(buffer, x, y, color);
+        }
     }
 
-    // Update the screen with the drawn content
-    // This would typically involve a system call or hardware-specific operation
+}
+
+static void gfx_draw_task() 
+{
+
+    if (!gfx_buffers) {
+        currentOutputStream->printf("Graphics buffers list is not initialized\n");
+        return;
+    }
+    if (list_is_empty(gfx_buffers)) {
+        currentOutputStream->printf("No graphics buffers available for drawing\n");
+        return;
+    }
+    
+    gfx_buffer* buffer = (gfx_buffer*)list_get(gfx_buffers, list_size(gfx_buffers) - 1);
+    if (!buffer) return; // No buffer to draw
+
+    memcpy((void*)hardware_buffer->buffer, (void*)buffer->buffer, buffer->size.width * buffer->size.height * sizeof(uint32_t));
 
 }
+

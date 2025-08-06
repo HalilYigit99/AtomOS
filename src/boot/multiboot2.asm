@@ -7,7 +7,7 @@ multiboot2_header:
     dd -(0xe85250d6 + 0 + (multiboot2_header_end - multiboot2_header))  ; Checksum
 
     align 8
-    .video_tag_800x600:
+    .video_tag:
         dw 5        ; Type (framebuffer tag)
         dw 0        ; Flags
         dd 20       ; Size
