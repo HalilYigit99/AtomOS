@@ -16,6 +16,15 @@ multiboot2_header:
         dd 32       ; Depth
 
     align 8
+    .efi_boot_services_tag:
+        dw 7
+        dw 0
+        dd 8
+
+    align 8
+    
+
+    align 8
 .end_tag:
     ; End tag
     dw 0    ; Type

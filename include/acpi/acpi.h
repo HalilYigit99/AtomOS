@@ -550,6 +550,15 @@ void acpi_parse_madt(acpi_madt_t *madt);
 void acpi_parse_fadt(acpi_fadt_t *fadt);
 void acpi_init(void);
 
+// Getter functions for cached ACPI tables
+acpi_fadt_t* acpi_get_fadt(void);
+acpi_madt_t* acpi_get_madt(void);
+acpi_hpet_t* acpi_get_hpet(void);
+acpi_mcfg_t* acpi_get_mcfg(void);
+acpi_srat_t* acpi_get_srat(void);
+acpi_slit_t* acpi_get_slit(void);
+uint8_t acpi_get_version(void);
+
 #ifdef __cplusplus
 }
 #endif
