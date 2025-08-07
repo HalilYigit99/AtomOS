@@ -1,4 +1,5 @@
-#include "string.h"
+#include <string.h>
+#include <memory/memory.h>
 
 // String uzunluğu hesaplama
 size_t strlen(const char *str) {
@@ -231,7 +232,14 @@ char *strnstr(const char *haystack, const char *needle, size_t len) {
 char *strdup(const char *str) {
     // Not implemented - heap allocation gerektirir
     // OS geliştikçe heap ile birlikte implement edilebilir
-    return NULL;
+
+    if (!str) return NULL;
+
+    size_t len = strlen(str);
+    char *dup = (char*)kmalloc(len + 1);
+    if (!dup) return NULL;
+    strcpy(dup, str);
+    return dup;
 }
 
 // String tokenize (basit implementasyon)

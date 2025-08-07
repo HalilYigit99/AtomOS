@@ -5,6 +5,8 @@ extern "C" {
 #endif
 
 #include <stdint.h>
+#include <stddef.h>
+#include <stdbool.h>
 
 /* Multiboot2 header magic */
 #define MULTIBOOT2_HEADER_MAGIC 0xe85250d6
@@ -72,7 +74,7 @@ struct multiboot_tag {
 struct multiboot_tag_string {
     uint32_t type;
     uint32_t size;
-    char string[0];
+    char string[];
 };
 
 /* Module tag */
@@ -269,7 +271,7 @@ extern struct multiboot_tag_efi64_ih *mb2_efi64_ih;
 extern struct multiboot_tag_load_base_addr *mb2_load_base_addr;
 
 /* Boot mode detection */
-extern int mb2_is_efi_boot;
+extern bool mb2_is_efi_boot;
 
 /* Function prototypes */
 void multiboot2_parse();
@@ -291,6 +293,21 @@ int multiboot2_efi_memory_map_iterate(void (*callback)(uint64_t addr, uint64_t l
 /* Framebuffer functions */
 struct multiboot_tag_framebuffer* multiboot2_get_framebuffer(void);
 int multiboot2_has_framebuffer(void);
+
+/* Additional getter functions */
+struct multiboot_tag_module* multiboot2_get_module(void);
+struct multiboot_tag_bootdev* multiboot2_get_bootdev(void);
+struct multiboot_tag_elf_sections* multiboot2_get_elf_sections(void);
+struct multiboot_tag_apm* multiboot2_get_apm(void);
+struct multiboot_tag_smbios* multiboot2_get_smbios(void);
+struct multiboot_tag_old_acpi* multiboot2_get_acpi_old(void);
+struct multiboot_tag_new_acpi* multiboot2_get_acpi_new(void);
+struct multiboot_tag_network* multiboot2_get_network(void);
+struct multiboot_tag_load_base_addr* multiboot2_get_load_base_addr(void);
+
+/* Helper functions */
+const char* multiboot2_memory_type_to_string(uint32_t type);
+const char* multiboot2_efi_memory_type_to_string(uint32_t type);
 
 #ifdef __cplusplus
 }

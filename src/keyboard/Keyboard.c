@@ -1,6 +1,7 @@
 #include <keyboard/Keyboard.h>
 #include <list.h>
 #include <print.h>
+#include <string.h>
 
 KeyboardLayouts currentLayout = LAYOUT_US_QWERTY; // Default keyboard layout
 
@@ -111,6 +112,8 @@ static int __readString(char* str, size_t maxLength) {
         }
     }
 
+    str[maxLength - 1] = '\0'; // Null-terminate the string
+    return strlen(str); // Return the length of the string read
 }
 
 static int __readBuffer(void* buffer, size_t size) {

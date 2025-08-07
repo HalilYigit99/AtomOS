@@ -510,31 +510,31 @@ void pci_disable_interrupts(pci_device_t* dev) {
 }
 
 // MSI/MSI-X support stubs
-bool pci_msi_capable(pci_device_t* dev) {
+bool pci_msi_capable(pci_device_t* dev __attribute__((unused))) {
     // TODO: Implement capability list parsing
     return false;
 }
 
-bool pci_msix_capable(pci_device_t* dev) {
+bool pci_msix_capable(pci_device_t* dev __attribute__((unused))) {
     // TODO: Implement capability list parsing
     return false;
 }
 
-int pci_enable_msi(pci_device_t* dev) {
+int pci_enable_msi(pci_device_t* dev __attribute__((unused))) {
     // TODO: Implement MSI enable
     return -1;
 }
 
-int pci_enable_msix(pci_device_t* dev) {
+int pci_enable_msix(pci_device_t* dev __attribute__((unused))) {
     // TODO: Implement MSI-X enable
     return -1;
 }
 
-void pci_disable_msi(pci_device_t* dev) {
+void pci_disable_msi(pci_device_t* dev __attribute__((unused))) {
     // TODO: Implement MSI disable
 }
 
-void pci_disable_msix(pci_device_t* dev) {
+void pci_disable_msix(pci_device_t* dev __attribute__((unused))) {
     // TODO: Implement MSI-X disable
 }
 

@@ -8,11 +8,10 @@ extern "C" {
 #include <stddef.h>
 #include <stdbool.h>
 
-#include <graphics/gfx.h>
-#include <stream/OutputStream.h>
+int util_basic_compare(const void* a, const void* b);
 
-
+void sleep(uint16_t ms);
 
 #ifdef __cplusplus
-}
+};
 #endif

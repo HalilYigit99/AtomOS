@@ -9,6 +9,9 @@ extern "C" {
 gfx_buffer* gfx_create_buffer();
 void gfx_destroy_buffer(gfx_buffer* buffer);
 
+void gfx_screen_register_buffer(gfx_buffer* buffer);
+void gfx_screen_unregister_buffer(gfx_buffer* buffer);
+
 void gfx_clear_buffer(gfx_buffer* buffer, gfx_color color);
 
 void gfx_draw_pixel(gfx_buffer* buffer, int x, int y, gfx_color color);

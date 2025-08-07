@@ -41,7 +41,7 @@ static void ps2kbd_enable(void);
 
 static void ps2kbd_disable(void);
 
-static void ps2kbd_stream_open();
+static int ps2kbd_stream_open();
 static void ps2kbd_stream_close();
 static int ps2kbd_stream_readChar(char* c);
 static int ps2kbd_stream_readString(char* str, size_t maxLength);
@@ -266,8 +266,8 @@ void ps2kbd_handler() {
 
 }
 
-static void ps2kbd_stream_open() {
-
+static int ps2kbd_stream_open() {
+    return 0; // Open the PS/2 keyboard input stream successfully
 }
 
 static void ps2kbd_stream_close() {
@@ -282,7 +282,7 @@ static int ps2kbd_stream_readChar(char* c) {
         return -1; // Invalid pointer or buffer not initialized
     }
 
-    if (list_size(ps2_event_buffer) == 0) {
+    if (buffer_count(ps2_event_buffer) == 0) {
         return -1; // No events to read
     }
 

@@ -2,6 +2,7 @@
 #include <stddef.h>
 #include <string.h>
 #include <stream/OutputStream.h>
+#include <efi/efi.h>
 
 /* Static local copies of tags (not in header) */
 static struct multiboot_tag_string mb2_cmdline_copy;
@@ -56,6 +57,8 @@ struct multiboot_tag_efi_mmap *mb2_efi_mmap = NULL;
 struct multiboot_tag_efi32_ih *mb2_efi32_ih = NULL;
 struct multiboot_tag_efi64_ih *mb2_efi64_ih = NULL;
 struct multiboot_tag_load_base_addr *mb2_load_base_addr = NULL;
+
+bool mb2_is_efi_boot = false; // Global flag for EFI boot
 
 extern uint32_t mb2_tagptr; // Pointer to the multiboot2 tags
 
@@ -370,4 +373,211 @@ void multiboot2_parse() {
         currentOutputStream->printf(msg);
     }
 
+    mb2_is_efi_boot = multiboot2_is_efi_boot();
+
+    if (mb2_is_efi_boot) {
+        efi_image_handle = (EFI_HANDLE)multiboot2_get_efi_image_handle();
+        efi_system_table = (EFI_SYSTEM_TABLE*)multiboot2_get_efi_system_table();
+    }
+
+}
+
+int multiboot2_is_efi_boot(void) {
+    return (mb2_efi32 != NULL || mb2_efi64 != NULL);
+}
+
+void* multiboot2_get_efi_system_table(void) {
+    if (mb2_efi64) {
+        return (void*)(uintptr_t)mb2_efi64->pointer;
+    } else if (mb2_efi32) {
+        return (void*)(uintptr_t)mb2_efi32->pointer;
+    }
+    return NULL;
+}
+
+void* multiboot2_get_efi_image_handle(void) {
+    if (mb2_efi64_ih) {
+        return (void*)(uintptr_t)mb2_efi64_ih->pointer;
+    } else if (mb2_efi32_ih) {
+        return (void*)(uintptr_t)mb2_efi32_ih->pointer;
+    }
+    return NULL;
+}
+
+const char* multiboot2_get_cmdline(void) {
+    if (mb2_cmdline && mb2_cmdline->string[0]) {
+        return cmdline_buffer; // Local copy'yi kullan
+    }
+    return NULL;
+}
+
+const char* multiboot2_get_bootloader_name(void) {
+    if (mb2_bootloader_name && mb2_bootloader_name->string[0]) {
+        return bootloader_name_buffer; // Local copy'yi kullan
+    }
+    return NULL;
+}
+
+// Memory information functions
+uint32_t multiboot2_get_memory_lower(void) {
+    if (mb2_basic_meminfo) {
+        return mb2_basic_meminfo->mem_lower;
+    }
+    return 0;
+}
+
+uint32_t multiboot2_get_memory_upper(void) {
+    if (mb2_basic_meminfo) {
+        return mb2_basic_meminfo->mem_upper;
+    }
+    return 0;
+}
+
+struct multiboot_mmap_entry* multiboot2_get_memory_map(uint32_t *entry_count) {
+    if (!mb2_mmap || !entry_count) {
+        if (entry_count) *entry_count = 0;
+        return NULL;
+    }
+    
+    *entry_count = (mb2_mmap->size - sizeof(struct multiboot_tag_mmap)) / mb2_mmap->entry_size;
+    return (struct multiboot_mmap_entry*)mmap_entries_buffer; // Local copy'yi kullan
+}
+
+// EFI specific functions
+struct multiboot_tag_efi_mmap* multiboot2_get_efi_memory_map(void) {
+    return mb2_efi_mmap;
+}
+
+int multiboot2_efi_memory_map_iterate(void (*callback)(uint64_t addr, uint64_t len, uint32_t type)) {
+    if (!mb2_efi_mmap || !callback) {
+        return 0;
+    }
+    
+    uint32_t entry_size = mb2_efi_mmap->descr_size;
+    uint32_t map_size = mb2_efi_mmap->size - sizeof(struct multiboot_tag_efi_mmap);
+    uint32_t entry_count = map_size / entry_size;
+    
+    uint8_t *entry_ptr = efi_mmap_buffer; // Local copy'yi kullan
+    
+    for (uint32_t i = 0; i < entry_count; i++) {
+        // EFI memory descriptor genelde şu formatta:
+        // Type (32-bit), Padding (32-bit), PhysicalStart (64-bit), VirtualStart (64-bit), 
+        // NumberOfPages (64-bit), Attribute (64-bit)
+        
+        uint32_t *type_ptr = (uint32_t*)entry_ptr;
+        uint64_t *addr_ptr = (uint64_t*)(entry_ptr + 8);
+        uint64_t *pages_ptr = (uint64_t*)(entry_ptr + 24);
+        
+        uint32_t type = *type_ptr;
+        uint64_t addr = *addr_ptr;
+        uint64_t len = *pages_ptr * 4096; // EFI page size is 4KB
+        
+        callback(addr, len, type);
+        
+        entry_ptr += entry_size;
+    }
+    
+    return entry_count;
+}
+
+// Framebuffer functions
+struct multiboot_tag_framebuffer* multiboot2_get_framebuffer(void) {
+    return mb2_framebuffer;
+}
+
+int multiboot2_has_framebuffer(void) {
+    return (mb2_framebuffer != NULL);
+}
+
+// Ek yardımcı fonksiyonlar
+struct multiboot_tag_module* multiboot2_get_module(void) {
+    return mb2_module;
+}
+
+struct multiboot_tag_bootdev* multiboot2_get_bootdev(void) {
+    return mb2_bootdev;
+}
+
+struct multiboot_tag_elf_sections* multiboot2_get_elf_sections(void) {
+    return mb2_elf_sections;
+}
+
+struct multiboot_tag_apm* multiboot2_get_apm(void) {
+    return mb2_apm;
+}
+
+struct multiboot_tag_smbios* multiboot2_get_smbios(void) {
+    return mb2_smbios;
+}
+
+struct multiboot_tag_old_acpi* multiboot2_get_acpi_old(void) {
+    return mb2_acpi_old;
+}
+
+struct multiboot_tag_new_acpi* multiboot2_get_acpi_new(void) {
+    return mb2_acpi_new;
+}
+
+struct multiboot_tag_network* multiboot2_get_network(void) {
+    return mb2_network;
+}
+
+struct multiboot_tag_load_base_addr* multiboot2_get_load_base_addr(void) {
+    return mb2_load_base_addr;
+}
+
+// Memory map yardımcı fonksiyonları
+const char* multiboot2_memory_type_to_string(uint32_t type) {
+    switch (type) {
+        case MULTIBOOT_MEMORY_AVAILABLE:
+            return "Available";
+        case MULTIBOOT_MEMORY_RESERVED:
+            return "Reserved";
+        case MULTIBOOT_MEMORY_ACPI_RECLAIMABLE:
+            return "ACPI Reclaimable";
+        case MULTIBOOT_MEMORY_NVS:
+            return "ACPI NVS";
+        case MULTIBOOT_MEMORY_BADRAM:
+            return "Bad RAM";
+        default:
+            return "Unknown";
+    }
+}
+
+// EFI memory type yardımcı fonksiyonu
+const char* multiboot2_efi_memory_type_to_string(uint32_t type) {
+    switch (type) {
+        case EFI_RESERVED_MEMORY_TYPE:
+            return "Reserved";
+        case EFI_LOADER_CODE:
+            return "Loader Code";
+        case EFI_LOADER_DATA:
+            return "Loader Data";
+        case EFI_BOOT_SERVICES_CODE:
+            return "Boot Services Code";
+        case EFI_BOOT_SERVICES_DATA:
+            return "Boot Services Data";
+        case EFI_RUNTIME_SERVICES_CODE:
+            return "Runtime Services Code";
+        case EFI_RUNTIME_SERVICES_DATA:
+            return "Runtime Services Data";
+        case EFI_CONVENTIONAL_MEMORY:
+            return "Conventional Memory";
+        case EFI_UNUSABLE_MEMORY:
+            return "Unusable Memory";
+        case EFI_ACPI_RECLAIM_MEMORY:
+            return "ACPI Reclaim Memory";
+        case EFI_ACPI_MEMORY_NVS:
+            return "ACPI Memory NVS";
+        case EFI_MEMORY_MAPPED_IO:
+            return "Memory Mapped IO";
+        case EFI_MEMORY_MAPPED_IO_PORT_SPACE:
+            return "Memory Mapped IO Port Space";
+        case EFI_PAL_CODE:
+            return "PAL Code";
+        case EFI_PERSISTENT_MEMORY:
+            return "Persistent Memory";
+        default:
+            return "Unknown";
+    }
 }

@@ -4,13 +4,13 @@
 extern "C" {
 #endif
 
-#include <stdint.h>
 #include <stddef.h>
-#include <stdbool.h>
+#include <stdint.h>
 
-#include <graphics/gfx.h>
-#include <stream/OutputStream.h>
+char* processorName;
+char* motherboardName;
 
+extern bool isEFI;
 
 
 #ifdef __cplusplus

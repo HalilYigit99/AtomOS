@@ -167,12 +167,12 @@ void pci_enable_interrupts(pci_device_t *dev);
 void pci_disable_interrupts(pci_device_t *dev);
 
 // MSI/MSI-X Support (Stub for future implementation)
-bool pci_msi_capable(pci_device_t *dev);
-bool pci_msix_capable(pci_device_t *dev);
-int pci_enable_msi(pci_device_t *dev);
-int pci_enable_msix(pci_device_t *dev);
-void pci_disable_msi(pci_device_t *dev);
-void pci_disable_msix(pci_device_t *dev);
+bool pci_msi_capable(pci_device_t *dev) __attribute__((unused));
+bool pci_msix_capable(pci_device_t *dev) __attribute__((unused));
+int pci_enable_msi(pci_device_t *dev) __attribute__((unused));
+int pci_enable_msix(pci_device_t *dev) __attribute__((unused));
+void pci_disable_msi(pci_device_t *dev) __attribute__((unused));
+void pci_disable_msix(pci_device_t *dev) __attribute__((unused));
 
 // Utility Functions
 const char* pci_get_vendor_name(uint16_t vendor_id);

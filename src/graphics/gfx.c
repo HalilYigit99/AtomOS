@@ -5,11 +5,13 @@
 #include <task/PeriodicTask.h>
 #include <stream/OutputStream.h>
 #include <math.h>
+#include <util.h>
 
 static volatile size_t screen_width;
 static volatile size_t screen_height;
 
 List* gfx_buffers;
+static bool gfx_buffers_busy;
 
 gfx_buffer* hardware_buffer;
 gfx_buffer* screen_buffer;
@@ -18,7 +20,19 @@ static PeriodicTask* gfx_task;
 
 static void gfx_draw_task();
 
-void  gfx_init() {
+void gfx_screen_register_buffer(gfx_buffer* buffer) {
+    gfx_buffers_busy = true;
+    list_add(gfx_buffers, buffer);
+    gfx_buffers_busy = false;
+}
+
+void gfx_screen_unregister_buffer(gfx_buffer* buffer) {
+    gfx_buffers_busy = true;
+    list_remove(gfx_buffers, buffer);
+    gfx_buffers_busy = false;
+}
+
+void gfx_init() {
 
     screen_height = mb2_framebuffer->framebuffer_height;
     screen_width = mb2_framebuffer->framebuffer_width;
@@ -51,13 +65,14 @@ void  gfx_init() {
     // Initialize screen buffer
     screen_buffer = gfx_create_buffer();
     gfx_clear_buffer(screen_buffer, (gfx_color){ .argb = 0xFF000000 }); // Clear screen to black
+    gfx_screen_register_buffer(screen_buffer);
 
     gfx_task = createPeriodicTask((uint32_t)gfx_draw_task, 100); // 10 FPS
     startPeriodicTask(gfx_task);
 
 }
 
-gfx_buffer*  gfx_create_buffer() 
+gfx_buffer* gfx_create_buffer() 
 {
     if (!gfx_buffers) {
         currentOutputStream->printf("[ERROR] Graphics buffers list is not initialized\n");
@@ -82,8 +97,6 @@ gfx_buffer*  gfx_create_buffer()
     buffer->bpp = 32; // Assuming 32 bits per pixel
     buffer->drawBeginLineIndex = 0;
 
-    list_add(gfx_buffers, buffer);
-
     return buffer;
 
 }
@@ -95,12 +108,12 @@ void gfx_destroy_buffer(gfx_buffer* buffer) {
     kfree(buffer);
     
     // Remove from the list
-    list_remove(gfx_buffers, buffer);
+    if (list_contains(gfx_buffers, buffer, util_basic_compare)) list_remove(gfx_buffers, buffer);
 }
 
 void  gfx_draw_pixel(gfx_buffer* buffer, int x, int y, gfx_color color)
 {
-    if (!buffer || x >= buffer->size.width || y >= buffer->size.height) return;
+    if (!buffer || x >= (int32_t)buffer->size.width || y >= (int32_t)buffer->size.height) return;
 
     volatile gfx_color* pixel = (volatile gfx_color*)((size_t)buffer->buffer + (y * buffer->size.width + x) * sizeof(uint32_t));
     pixel->argb = color.argb;
@@ -268,11 +281,11 @@ void gfx_draw_char(gfx_buffer* buffer, int x, int y, char c, gfx_color color, gf
             unsigned char (*bitmap_font)[font->size.height] = (unsigned char (*)[font->size.height])font->glyphs;
             
             // Her satır için
-            for (int row = 0; row < font->size.height; row++) {
+            for (int row = 0; row < (int32_t)font->size.height; row++) {
                 unsigned char bitmap_row = bitmap_font[char_index][row];
                 
                 // Her bit için (MSB solda, LSB sağda)
-                for (int col = 0; col < font->size.width; col++) {
+                for (int col = 0; col < (int32_t)font->size.width; col++) {
                     // MSB'den başlayarak bit kontrol et (7, 6, 5, 4, 3, 2, 1, 0)
                     if (bitmap_row & (1 << (font->size.width - 1 - col))) {
                         gfx_draw_pixel(buffer, x + col, y + row, color);
@@ -336,6 +349,8 @@ void gfx_clear_buffer(gfx_buffer* buffer, gfx_color color) {
 
 static void gfx_draw_task() 
 {
+
+    if (gfx_buffers_busy) return;
 
     if (!gfx_buffers) {
         currentOutputStream->printf("Graphics buffers list is not initialized\n");
