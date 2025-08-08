@@ -27,6 +27,8 @@ _start:
     ; Setup kernel heap and other kernel structures
     call __kernel_setup
 
+    sti
+
     push 0 ; Push argc (0 for now)
     push 0 ; Push argv (NULL for now)
     call main ; Call the main kernel function

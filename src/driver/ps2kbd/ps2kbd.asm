@@ -7,12 +7,15 @@ extern ps2kbd_handler
 use32
 
 ps2kbd_isr:
+    cli
     pushad
 
     call ps2kbd_handler
 
-    mov ax, 0x20
-    out 0x20, al  ; Send End of Interrupt (EOI) to the PIC
+    mov al, 0x20
+    out 0xa0, al    ; slave PIC (IRQ12 buradan gelir)
+    out 0x20, al    ; master PIC (slave'den geleni devre dışı bırakmak için)
 
     popad
+    sti
     iret

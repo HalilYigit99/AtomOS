@@ -12,6 +12,8 @@
 
 extern char __kernel_end; // End of kernel binary
 
+extern Driver ps2mouse_driver;
+
 void __kernelHeap_setup();
 void gfx_init();
 void acpi_init();
@@ -40,6 +42,9 @@ void __kernel_setup()
 
     // Initialize PCI subsystem
     pci_init();
+
+    // Register PS/2 mouse driver
+    sys_driver_register(&ps2mouse_driver);
 
     // Register PS/2 keyboard driver
     sys_driver_register(&ps2kbd_driver);

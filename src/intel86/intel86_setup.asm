@@ -33,7 +33,4 @@ intel86_setup_next:
 
     call intel86_pit_init  ; Initialize the Programmable Interval Timer (PIT)
 
-    ; Enable interrupts
-    sti
-
     ret

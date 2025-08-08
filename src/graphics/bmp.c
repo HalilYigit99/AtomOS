@@ -6,6 +6,18 @@
 // Global error state
 static bmp_result last_error = BMP_SUCCESS;
 
+// __builtin_ctz() yerine manuel count trailing zeros fonksiyonu
+static int manual_ctz(uint32_t value) {
+    if (value == 0) return 32;
+    
+    int count = 0;
+    while ((value & 1) == 0) {
+        value >>= 1;
+        count++;
+    }
+    return count;
+}
+
 // Helper function to set error and return NULL
 static void* bmp_set_error(bmp_result error) {
     last_error = error;
@@ -108,7 +120,7 @@ static gfx_color bmp_bgr24_to_argb32(uint8_t* bgr_pixel) {
     return color;
 }
 
-// Convert 32-bit BGRA pixel to 32-bit ARGB using bit masks
+// Convert 32-bit BGRA pixel to 32-bit ARGB using bit masks - DÜZELTİLMİŞ VERSİYON
 static gfx_color bmp_bgra32_to_argb32_with_masks(uint8_t* pixel_data, 
                                                   uint32_t red_mask, uint32_t green_mask, 
                                                   uint32_t blue_mask, uint32_t alpha_mask) {
@@ -126,29 +138,28 @@ static gfx_color bmp_bgra32_to_argb32_with_masks(uint8_t* pixel_data,
         return color;
     }
     
-    // Extract color components using bit masks
+    // Extract color components using bit masks - MANUAL CTZ
     if (red_mask) {
         uint32_t red_value = pixel_value & red_mask;
-        // Shift to get actual value
-        int red_shift = __builtin_ctz(red_mask); // Count trailing zeros
+        int red_shift = manual_ctz(red_mask);  // __builtin_ctz yerine manual_ctz
         color.r = (red_value >> red_shift) & 0xFF;
     }
     
     if (green_mask) {
         uint32_t green_value = pixel_value & green_mask;
-        int green_shift = __builtin_ctz(green_mask);
+        int green_shift = manual_ctz(green_mask);  // __builtin_ctz yerine manual_ctz
         color.g = (green_value >> green_shift) & 0xFF;
     }
     
     if (blue_mask) {
         uint32_t blue_value = pixel_value & blue_mask;
-        int blue_shift = __builtin_ctz(blue_mask);
+        int blue_shift = manual_ctz(blue_mask);  // __builtin_ctz yerine manual_ctz
         color.b = (blue_value >> blue_shift) & 0xFF;
     }
     
     if (alpha_mask) {
         uint32_t alpha_value = pixel_value & alpha_mask;
-        int alpha_shift = __builtin_ctz(alpha_mask);
+        int alpha_shift = manual_ctz(alpha_mask);  // __builtin_ctz yerine manual_ctz
         color.a = (alpha_value >> alpha_shift) & 0xFF;
     } else {
         color.a = 0xFF; // Fully opaque if no alpha mask

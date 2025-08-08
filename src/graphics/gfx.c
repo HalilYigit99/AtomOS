@@ -114,6 +114,9 @@ void gfx_destroy_buffer(gfx_buffer* buffer) {
 
 void  gfx_draw_pixel(gfx_buffer* buffer, int x, int y, gfx_color color)
 {
+
+    if (color.a == 0) return;
+
     if (!buffer || x >= (int32_t)buffer->size.width || y >= (int32_t)buffer->size.height) return;
 
     volatile gfx_color* pixel = (volatile gfx_color*)((size_t)buffer->buffer + (y * buffer->size.width + x) * sizeof(uint32_t));
@@ -333,7 +336,6 @@ void gfx_draw_bitmap(gfx_buffer* buffer, int x, int y, void* bitmap, size_t widt
     for (size_t j = 0; j < height; j++) {
         for (size_t i = 0; i < width; i++) {
             gfx_color pixel_color = src[j * width + i];
-            if (pixel_color.a == 0) continue; // Alpha 0 means transparent, skip drawing
             gfx_draw_pixel(buffer, x + i, y + j, pixel_color);
         }
     }
