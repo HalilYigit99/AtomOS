@@ -49,14 +49,19 @@ SECTIONS
         __stack_end = .;
     } :data
 
-    . = ALIGN(4);
-
-    __kernel_end = .;
-
     /* Discard sections that can cause RWX warnings */
     /DISCARD/ :
     {
         *(.note.gnu.property)
         *(.gnu.hash)
     }
+
+    . = ALIGN(4);
+
+    __kernel_end = .;
+
+    .note.Xen.pvh : {
+        KEEP(*(.note.Xen.pvh))
+    }
+
 }

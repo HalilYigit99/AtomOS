@@ -69,6 +69,11 @@ typedef struct {
     gfx_font_type type; // Type of the font
 } gfx_font;
 
+typedef struct {
+    gfx_size size; // Size of the bitmap
+    uint8_t* pixels; // Pointer to pixel data
+} gfx_bitmap;
+
 // Global değişkenler
 extern gfx_buffer* screen_buffer; // Global screen buffer
 extern gfx_font* default_font; // Global default font

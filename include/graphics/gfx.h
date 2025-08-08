@@ -30,7 +30,6 @@ void gfx_draw_char(gfx_buffer* buffer, int x, int y, char c, gfx_color color, gf
 void gfx_draw_text(gfx_buffer* buffer, int x, int y, char* text, gfx_color color, gfx_font* font);
 void gfx_draw_bitmap(gfx_buffer* buffer, int x, int y, void* bitmap, size_t width, size_t height);
 
-void gfx_copy_buffer(gfx_buffer* src, gfx_buffer* dest, int src_x, int src_y, int dest_x, int dest_y, size_t width, size_t height);
 
 #ifdef __cplusplus
 }

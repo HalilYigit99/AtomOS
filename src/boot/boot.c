@@ -9,7 +9,6 @@
 #include <driver/Driver.h>
 #include <keyboard/Keyboard.h>
 #include <graphics/gfx.h>
-#include <acpi/acpi.h>
 
 extern char __kernel_end; // End of kernel binary
 
@@ -38,11 +37,6 @@ void __kernel_setup()
     gfx_init();
 
     currentOutputStream->printf("Graphics subsystem initialized.\n");
-
-    // Initialize ACPI subsystem
-    acpi_init();
-
-    currentOutputStream->printf("ACPI subsystem initialized.\n");
 
     // Initialize PCI subsystem
     pci_init();

@@ -6,6 +6,7 @@
 #include <stream/OutputStream.h>
 #include <math.h>
 #include <util.h>
+#include <mouse/mouse.h>
 
 static volatile size_t screen_width;
 static volatile size_t screen_height;
@@ -331,7 +332,9 @@ void gfx_draw_bitmap(gfx_buffer* buffer, int x, int y, void* bitmap, size_t widt
     gfx_color* src = (gfx_color*)bitmap;
     for (size_t j = 0; j < height; j++) {
         for (size_t i = 0; i < width; i++) {
-            gfx_draw_pixel(buffer, x + i, y + j, src[j * width + i]);
+            gfx_color pixel_color = src[j * width + i];
+            if (pixel_color.a == 0) continue; // Alpha 0 means transparent, skip drawing
+            gfx_draw_pixel(buffer, x + i, y + j, pixel_color);
         }
     }
 }
@@ -346,6 +349,8 @@ void gfx_clear_buffer(gfx_buffer* buffer, gfx_color color) {
     }
 
 }
+
+extern void __mouse_draw();
 
 static void gfx_draw_task() 
 {
@@ -366,5 +371,8 @@ static void gfx_draw_task()
 
     memcpy((void*)hardware_buffer->buffer, (void*)buffer->buffer, buffer->size.width * buffer->size.height * sizeof(uint32_t));
 
+    // Draw mouse cursor
+
+    __mouse_draw();
 }
 

@@ -9,6 +9,7 @@ extern "C" {
 #include <stdbool.h>
 
 extern void kprintf(const char* fmt, ...);
+extern void printf(const char* fmt, ...);
 
 #ifdef __cplusplus
 }
