@@ -1,138 +1,207 @@
 #include <intel86.h>
+#include <hal/irqController.h>
 #include <driver/Driver.h>
 #include <print.h>
 #include <driver/ps2mouse/ps2mouse.h>
+#include <driver/ps2controller/ps2controller.h>
 
 static bool enabled = false;
+static uint8_t packet_buffer[3];
+static size_t packet_index = 0;
 
-extern int cursor_X; // Current cursor X position
-extern int cursor_Y; // Current cursor Y position
-
+extern int cursor_X;
+extern int cursor_Y;
 extern void ps2mouse_isr(void);
 
-// Helper functions for PS/2 controller communication
-void ps2mouse_wait_write(void) {
-    // Wait until input buffer is empty (bit 1 clear)
-    int timeout = 100000;
-    while ((inb(PS2_STATUS_PORT) & PS2_STATUS_INPUT_FULL) && timeout--) {
-        // Small delay
-        asm volatile("pause");
-    }
-    if (timeout == 0) {
-        kprintf("PS/2 Mouse: Write timeout!\n");
-    }
-}
-
-void ps2mouse_wait_read(void) {
-    // Wait until output buffer is full (bit 0 set)
-    int timeout = 100000;
-    while (!(inb(PS2_STATUS_PORT) & PS2_STATUS_OUTPUT_FULL) && timeout--) {
-        // Small delay
-        asm volatile("pause");
-    }
-    if (timeout == 0) {
-        kprintf("PS/2 Mouse: Read timeout!\n");
-    }
-}
-
-uint8_t ps2mouse_read_data(void) {
-    ps2mouse_wait_read();
-    return inb(PS2_DATA_PORT);
-}
-
-void ps2mouse_write_command(uint8_t cmd) {
-    ps2mouse_wait_write();
-    outb(PS2_COMMAND_PORT, cmd);
-}
-
-void ps2mouse_write_data(uint8_t data) {
-    ps2mouse_wait_write();
-    outb(PS2_DATA_PORT, data);
-}
-
-// Send command to mouse (not controller)
-void ps2mouse_send_command(uint8_t cmd) {
-    ps2mouse_write_command(PS2_CMD_WRITE_TO_AUX);
-    ps2mouse_write_data(cmd);
+// Mouse'a komut gönder (controller'a değil)
+static bool ps2mouse_send_command_to_device(uint8_t cmd) {
+    ps2_controller_write_command(PS2_CMD_WRITE_TO_AUX);
+    ps2_controller_write_data(cmd);
     
-    // Wait for ACK
-    uint8_t response = ps2mouse_read_data();
-    if (response != PS2_MOUSE_ACK) {
-        kprintf("PS/2 Mouse: Command 0x%02X failed, got 0x%02X\n", cmd, response);
+    int timeout = 1000;
+    while (timeout-- > 0) {
+        if (ps2_controller_wait_read()) {
+            uint8_t response = ps2_controller_read_data();
+            if (response == PS2_MOUSE_ACK) {
+                return true;
+            } else if (response == PS2_MOUSE_RESEND) {
+                return false;
+            }
+        }
     }
+    
+    kprintf("PS/2 Mouse: Command 0x%02X timeout\n", cmd);
+    return false;
 }
 
 void ps2mouse_init(void) {
-    kprintf("PS/2 mouse hardware initializing...\n");
+    kprintf("PS/2 mouse initializing...\n");
     
-    // Step 1: Enable auxiliary device (mouse port)
-    ps2mouse_write_command(PS2_CMD_ENABLE_AUX);
-    
-    // Step 2: Get current controller configuration
-    ps2mouse_write_command(PS2_CMD_READ_CONFIG);
-    uint8_t config = ps2mouse_read_data();
-    
-    // Step 3: Enable mouse interrupt (IRQ12) and mouse clock
-    config |= 0x02;   // Enable interrupt for auxiliary port (bit 1)
-    config &= ~0x20;  // Enable auxiliary clock (clear bit 5)
-    
-    // Step 4: Write back configuration
-    ps2mouse_write_command(PS2_CMD_WRITE_CONFIG);
-    ps2mouse_write_data(config);
-    
-    // Step 5: Reset mouse
-    kprintf("PS/2 Mouse: Resetting mouse...\n");
-    ps2mouse_write_command(PS2_CMD_WRITE_TO_AUX);
-    ps2mouse_write_data(PS2_MOUSE_CMD_RESET);
-    
-    // Wait for ACK
-    uint8_t ack = ps2mouse_read_data();
-    if (ack != PS2_MOUSE_ACK) {
-        kprintf("PS/2 Mouse: Reset ACK failed: 0x%02X\n", ack);
+    // Controller başlatıldığından emin ol
+    if (!ps2_controller_initialized) {
+        if (!ps2_controller_init()) {
+            kprintf("PS/2 Mouse: Controller init failed!\n");
+            return;
+        }
     }
     
-    // Wait for self-test result (0xAA for success)
-    uint8_t test_result = ps2mouse_read_data();
-    if (test_result != 0xAA) {
-        kprintf("PS/2 Mouse: Self-test failed: 0x%02X\n", test_result);
+    // Mouse port'u test et
+    kprintf("PS/2 Mouse: Testing mouse port...\n");
+    ps2_controller_write_command(0xA9); // Test mouse port
+    uint8_t test_result = ps2_controller_read_data();
+    if (test_result != 0x00) {
+        kprintf("PS/2 Mouse: Port test failed: 0x%02X\n", test_result);
     }
     
-    // Wait for device ID (usually 0x00 for standard mouse)
-    uint8_t device_id = ps2mouse_read_data();
-    kprintf("PS/2 Mouse: Device ID: 0x%02X\n", device_id);
+    // Mouse port'unu etkinleştir
+    ps2_controller_write_command(PS2_CMD_ENABLE_PORT2);
     
-    // Step 6: Set defaults
-    ps2mouse_send_command(PS2_MOUSE_CMD_SET_DEFAULTS);
+    // Controller config'i oku
+    uint8_t config = ps2_controller_get_config();
+    kprintf("PS/2 Mouse: Initial config: 0x%02X\n", config);
     
-    // Step 7: Disable data reporting
-    ps2mouse_send_command(PS2_MOUSE_CMD_DISABLE_REPORTING);
+    // ÖNEMLİ: Klavye ayarlarını KORU, sadece mouse bitlerini değiştir
+    config |= 0x02;   // Bit 1 = Enable mouse interrupt
+    config &= ~0x20;  // Bit 5 = Enable mouse clock (clear = enabled)
+    // Klavye bitlerini koru
+    config |= 0x01;   // Bit 0 = Keep keyboard interrupt enabled
+    config &= ~0x10;  // Bit 4 = Keep keyboard clock enabled
+    config &= ~0x40;  // Bit 6 = Keep translation disabled (raw scancode)
     
-    // Step 8: Setup interrupt handler BEFORE unmasking
+    ps2_controller_set_config(config);
+    
+    // Tekrar oku ve doğrula
+    config = ps2_controller_get_config();
+    kprintf("PS/2 Mouse: After config update: 0x%02X\n", config);
+    
+    // Buffer'ı temizle
+    ps2_controller_flush_buffer();
+    
+    // ÖNEMLİ: Mouse'u reset etmeden önce bir süre bekle
+    for (int i = 0; i < 10000; i++) io_wait();
+    
+    // Mouse'u reset et
+    kprintf("PS/2 Mouse: Resetting mouse device...\n");
+    ps2_controller_write_command(PS2_CMD_WRITE_TO_AUX);
+    ps2_controller_write_data(PS2_MOUSE_CMD_RESET);
+    
+    // Reset yanıtlarını bekle (timeout'lu)
+    int timeout = 100000;
+    while (timeout-- > 0 && !(inb(PS2_STATUS_PORT) & 0x01)) {
+        io_wait();
+    }
+    
+    if (timeout > 0) {
+        uint8_t ack = inb(PS2_DATA_PORT);
+        kprintf("PS/2 Mouse: Reset ACK: 0x%02X\n", ack);
+        
+        if (ack == PS2_MOUSE_ACK) {
+            // Self-test result bekle
+            timeout = 100000;
+            while (timeout-- > 0 && !(inb(PS2_STATUS_PORT) & 0x01)) {
+                io_wait();
+            }
+            if (timeout > 0) {
+                uint8_t test = inb(PS2_DATA_PORT);
+                kprintf("PS/2 Mouse: Self-test result: 0x%02X\n", test);
+                
+                // Device ID bekle
+                timeout = 100000;
+                while (timeout-- > 0 && !(inb(PS2_STATUS_PORT) & 0x01)) {
+                    io_wait();
+                }
+                if (timeout > 0) {
+                    uint8_t id = inb(PS2_DATA_PORT);
+                    kprintf("PS/2 Mouse: Device ID: 0x%02X\n", id);
+                }
+            }
+        }
+    }
+    
+    // Defaults ayarla
+    kprintf("PS/2 Mouse: Setting defaults...\n");
+    ps2_controller_write_command(PS2_CMD_WRITE_TO_AUX);
+    ps2_controller_write_data(PS2_MOUSE_CMD_SET_DEFAULTS);
+    timeout = 10000;
+    while (timeout-- > 0 && !(inb(PS2_STATUS_PORT) & 0x01)) io_wait();
+    if (timeout > 0) inb(PS2_DATA_PORT); // ACK'i oku
+    
+    // Sample rate ayarla
+    ps2_controller_write_command(PS2_CMD_WRITE_TO_AUX);
+    ps2_controller_write_data(0xF3); // Set sample rate
+    timeout = 10000;
+    while (timeout-- > 0 && !(inb(PS2_STATUS_PORT) & 0x01)) io_wait();
+    if (timeout > 0) inb(PS2_DATA_PORT); // ACK
+    
+    ps2_controller_write_command(PS2_CMD_WRITE_TO_AUX);
+    ps2_controller_write_data(60); // 60 samples/sec (daha düşük değer dene)
+    timeout = 10000;
+    while (timeout-- > 0 && !(inb(PS2_STATUS_PORT) & 0x01)) io_wait();
+    if (timeout > 0) inb(PS2_DATA_PORT); // ACK
+    
+    // IDT'ye interrupt handler ekle
+    kprintf("PS/2 Mouse: Setting up IRQ12 handler...\n");
     intel86_idt_set_entry(32 + 12, (uint32_t)ps2mouse_isr, 0x08, 0x8E);
     
-    // Step 9: Clear any pending data
-    while (inb(PS2_STATUS_PORT) & PS2_STATUS_OUTPUT_FULL) {
+    // PIC'de IRQ12'yi unmask et
+    kprintf("PS/2 Mouse: Unmasking IRQ12...\n");
+    irq_controller->enable_irq(12);
+    
+    // Son config kontrolü
+    config = ps2_controller_get_config();
+    kprintf("PS/2 Mouse: Config before data reporting: 0x%02X\n", config);
+    
+    // Data reporting'i aç
+    kprintf("PS/2 Mouse: Enabling data reporting...\n");
+    ps2_controller_write_command(PS2_CMD_WRITE_TO_AUX);
+    ps2_controller_write_data(PS2_MOUSE_CMD_ENABLE_REPORTING);
+    timeout = 10000;
+    while (timeout-- > 0 && !(inb(PS2_STATUS_PORT) & 0x01)) io_wait();
+    if (timeout > 0) {
+        uint8_t response = inb(PS2_DATA_PORT);
+        kprintf("PS/2 Mouse: Enable reporting response: 0x%02X\n", response);
+    }
+    
+    // Buffer'ı son kez temizle
+    while (inb(PS2_STATUS_PORT) & 0x01) {
         inb(PS2_DATA_PORT);
     }
     
-    kprintf("PS/2 mouse hardware initialized!\n");
+    // Packet index'i sıfırla
+    packet_index = 0;
+    
+    // Son config durumu
+    config = ps2_controller_get_config();
+    kprintf("PS/2 Mouse: Final config: 0x%02X (should be 0x03 or similar)\n", config);
+    
+    kprintf("PS/2 mouse initialized! Waiting for interrupts...\n");
 }
 
 void ps2mouse_enable(void) {
     if (!enabled) {
-        // Send enable command to mouse
-        ps2mouse_send_command(PS2_MOUSE_CMD_ENABLE_REPORTING);
-        pic_unmask(12);
+        kprintf("PS/2 Mouse: Enabling...\n");
+        
+        // Data reporting'i tekrar aç (emin olmak için)
+        ps2mouse_send_command_to_device(PS2_MOUSE_CMD_ENABLE_REPORTING);
+        
+        // IRQ12'nin açık olduğundan emin ol
+        irq_controller->enable_irq(12);
+        
+        // Controller config'i kontrol et
+        uint8_t config = ps2_controller_get_config();
+        config |= 0x02;  // Mouse interrupt enable
+        config &= ~0x20; // Mouse clock enable
+        ps2_controller_set_config(config);
+        
         enabled = true;
-        kprintf("PS/2 Mouse: Enabled\n");
+        kprintf("PS/2 Mouse: Enabled (config: 0x%02X)\n", ps2_controller_get_config());
     }
 }
 
 void ps2mouse_disable(void) {
     if (enabled) {
-        // Send disable command to mouse
-        ps2mouse_send_command(PS2_MOUSE_CMD_DISABLE_REPORTING);
-        pic_mask(12);
+        ps2mouse_send_command_to_device(PS2_MOUSE_CMD_DISABLE_REPORTING);
+        irq_controller->disable_irq(12);
         enabled = false;
         kprintf("PS/2 Mouse: Disabled\n");
     }
@@ -142,82 +211,60 @@ bool ps2mouse_enabled(void) {
     return enabled;
 }
 
-static uint8_t packet_buffer[3];
-static size_t packet_index = 0;
-
 void ps2mouse_isr_handler(void) {
-
-    kprintf("How do we get here?\n");
-
-    // Read status to check if data is from mouse
+    kprintf("MOUSE INTERRUPT!\n"); // İlk önce buraya geldiğini görelim
+    
+    // Status register'ı oku
     uint8_t status = inb(PS2_STATUS_PORT);
+    kprintf("Mouse ISR: Status = 0x%02X\n", status);
     
-    // Check if data is available and it's from mouse (AUX)
+    // Veri var mı kontrol et
     if (!(status & PS2_STATUS_OUTPUT_FULL)) {
-        return;  // No data available
-    }
-    
-    // Check if data is from mouse (bit 5 should be set for AUX data)
-    if (!(status & PS2_STATUS_AUX_DATA)) {
-        // Data is from keyboard, not mouse - read and discard
-        inb(PS2_DATA_PORT);
+        kprintf("Mouse ISR: No data available\n");
         return;
     }
     
-    // Read the mouse data byte
+    // Veriyi oku
     uint8_t data = inb(PS2_DATA_PORT);
+    kprintf("Mouse ISR: Data = 0x%02X, AUX bit = %d\n", 
+            data, (status & PS2_STATUS_AUX_DATA) ? 1 : 0);
     
-    // Store the byte in our buffer
-    packet_buffer[packet_index] = data;
-    packet_index++;
+    // Mouse verisi mi kontrol et
+    if (!(status & PS2_STATUS_AUX_DATA)) {
+        kprintf("Mouse ISR: Data is not from mouse\n");
+        return;
+    }
     
-    // If we have received all 3 bytes of a mouse packet
+    // Packet topla
+    packet_buffer[packet_index++] = data;
+    kprintf("Mouse ISR: Packet byte %d = 0x%02X\n", packet_index - 1, data);
+    
     if (packet_index >= 3) {
-        packet_index = 0;
-        
-        // Parse the mouse packet
         uint8_t flags = packet_buffer[0];
-        int8_t delta_x = packet_buffer[1];
-        int8_t delta_y = packet_buffer[2];
         
-        // Check if the packet is valid (bit 3 should always be set)
-        if (!(flags & PS2_MOUSE_ALWAYS_1)) {
-            kprintf("PS/2 Mouse: Invalid packet (flags=0x%02X)\n", flags);
-            // Reset packet index to resync
-            packet_index = 0;
-            return;
+        if (flags & PS2_MOUSE_ALWAYS_1) {
+            int8_t delta_x = packet_buffer[1];
+            int8_t delta_y = packet_buffer[2];
+            
+            if (!(flags & (PS2_MOUSE_X_OVERFLOW | PS2_MOUSE_Y_OVERFLOW))) {
+                if (flags & PS2_MOUSE_X_SIGN) {
+                    delta_x |= 0xFFFFFF00;
+                }
+                if (flags & PS2_MOUSE_Y_SIGN) {
+                    delta_y |= 0xFFFFFF00;
+                }
+                
+                delta_y = -delta_y;
+                
+                cursor_X += delta_x;
+                cursor_Y += delta_y;
+                
+                kprintf("Mouse moved: X=%d Y=%d (dx=%d dy=%d)\n", 
+                        cursor_X, cursor_Y, delta_x, delta_y);
+            }
         }
         
-        // Check for overflow
-        if (flags & (PS2_MOUSE_X_OVERFLOW | PS2_MOUSE_Y_OVERFLOW)) {
-            kprintf("PS/2 Mouse: Overflow detected\n");
-            return;
-        }
-        
-        // Apply sign extension if needed
-        if (flags & PS2_MOUSE_X_SIGN) {
-            delta_x |= 0xFFFFFF00;
-        }
-        if (flags & PS2_MOUSE_Y_SIGN) {
-            delta_y |= 0xFFFFFF00;
-        }
-        
-        // Y coordinate is inverted in PS/2 mouse
-        delta_y = -delta_y;
-        
-        // Update mouse state
-        cursor_X += delta_x;
-        cursor_Y += delta_y;
-        bool left_button = (flags & PS2_MOUSE_LEFT_BTN) ? true : false;
-        bool right_button = (flags & PS2_MOUSE_RIGHT_BTN) ? true : false;
-        bool middle_button = (flags & PS2_MOUSE_MIDDLE_BTN) ? true : false;
-        bool packet_ready = true;
-        
-        // Debug output
-        kprintf("Mouse: X=%d, Y=%d, L=%d, R=%d, M=%d (dx=%d, dy=%d)\n",
-                cursor_X, cursor_Y,
-                left_button, right_button, middle_button,
-                delta_x, delta_y);
+        packet_index = 0;
     }
 }
 

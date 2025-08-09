@@ -11,6 +11,7 @@ static struct multiboot_tag_module mb2_module_copy;
 static struct multiboot_tag_basic_meminfo mb2_basic_meminfo_copy;
 static struct multiboot_tag_bootdev mb2_bootdev_copy;
 static struct multiboot_tag_mmap mb2_mmap_copy;
+static struct multiboot_tag_vbe mb2_vbe_copy;
 static struct multiboot_tag_framebuffer mb2_framebuffer_copy;
 static struct multiboot_tag_elf_sections mb2_elf_sections_copy;
 static struct multiboot_tag_apm mb2_apm_copy;
@@ -44,6 +45,7 @@ struct multiboot_tag_module *mb2_module = NULL;
 struct multiboot_tag_basic_meminfo *mb2_basic_meminfo = NULL;
 struct multiboot_tag_bootdev *mb2_bootdev = NULL;
 struct multiboot_tag_mmap *mb2_mmap = NULL;
+struct multiboot_tag_vbe *mb2_vbe = NULL;
 struct multiboot_tag_framebuffer *mb2_framebuffer = NULL;
 struct multiboot_tag_elf_sections *mb2_elf_sections = NULL;
 struct multiboot_tag_apm *mb2_apm = NULL;
@@ -65,6 +67,8 @@ extern uint32_t mb2_tagptr; // Pointer to the multiboot2 tags
 void multiboot2_parse() {
     struct multiboot_tag *tag;
     
+    currentOutputStream->printf("Mb2 tag ptr: %p\n", mb2_tagptr);
+    
     /* Skip the first 8 bytes (total_size and reserved) */
     tag = (struct multiboot_tag *)(mb2_tagptr + 8);
     
@@ -72,6 +76,7 @@ void multiboot2_parse() {
     while (tag->type != MULTIBOOT_TAG_TYPE_END) {
         switch (tag->type) {
             case MULTIBOOT_TAG_TYPE_CMDLINE:
+                currentOutputStream->printf("Multiboot2: CMDLINE tag found\n");
                 if (!mb2_cmdline) {
                     struct multiboot_tag_string *str_tag = (struct multiboot_tag_string *)tag;
                     
@@ -92,6 +97,7 @@ void multiboot2_parse() {
                 break;
                 
             case MULTIBOOT_TAG_TYPE_BOOT_LOADER_NAME:
+                currentOutputStream->printf("Multiboot2: Bootloader name tag found\n");
                 if (!mb2_bootloader_name) {
                     struct multiboot_tag_string *str_tag = (struct multiboot_tag_string *)tag;
                     
@@ -112,6 +118,7 @@ void multiboot2_parse() {
                 break;
                 
             case MULTIBOOT_TAG_TYPE_MODULE:
+                currentOutputStream->printf("Multiboot2: Module tag found\n");
                 if (!mb2_module) {
                     struct multiboot_tag_module *mod_tag = (struct multiboot_tag_module *)tag;
                     
@@ -132,6 +139,7 @@ void multiboot2_parse() {
                 break;
                 
             case MULTIBOOT_TAG_TYPE_BASIC_MEMINFO:
+                currentOutputStream->printf("Multiboot2: Basic memory info tag found\n");
                 if (!mb2_basic_meminfo) {
                     /* Fixed size structure, simple copy */
                     memcpy(&mb2_basic_meminfo_copy, tag, sizeof(struct multiboot_tag_basic_meminfo));
@@ -140,6 +148,7 @@ void multiboot2_parse() {
                 break;
                 
             case MULTIBOOT_TAG_TYPE_BOOTDEV:
+                currentOutputStream->printf("Multiboot2: Boot device tag found\n");
                 if (!mb2_bootdev) {
                     /* Fixed size structure, simple copy */
                     memcpy(&mb2_bootdev_copy, tag, sizeof(struct multiboot_tag_bootdev));
@@ -148,6 +157,7 @@ void multiboot2_parse() {
                 break;
                 
             case MULTIBOOT_TAG_TYPE_MMAP:
+                currentOutputStream->printf("Multiboot2: Memory map tag found\n");
                 if (!mb2_mmap) {
                     struct multiboot_tag_mmap *mmap_tag = (struct multiboot_tag_mmap *)tag;
                     
@@ -167,7 +177,17 @@ void multiboot2_parse() {
                 }
                 break;
                 
+            case MULTIBOOT_TAG_TYPE_VBE:
+                currentOutputStream->printf("Multiboot2: VBE tag found\n");
+                if (!mb2_vbe) {
+                    /* Fixed size structure, simple copy */
+                    memcpy(&mb2_vbe_copy, tag, sizeof(struct multiboot_tag_vbe));
+                    mb2_vbe = &mb2_vbe_copy;
+                }
+                break;
+                
             case MULTIBOOT_TAG_TYPE_FRAMEBUFFER:
+                currentOutputStream->printf("Multiboot2: Framebuffer tag found\n");
                 if (!mb2_framebuffer) {
                     /* Copy the entire framebuffer structure */
                     memcpy(&mb2_framebuffer_copy, tag, sizeof(struct multiboot_tag_framebuffer));
@@ -176,6 +196,7 @@ void multiboot2_parse() {
                 break;
                 
             case MULTIBOOT_TAG_TYPE_ELF_SECTIONS:
+                currentOutputStream->printf("Multiboot2: ELF sections tag found\n");
                 if (!mb2_elf_sections) {
                     struct multiboot_tag_elf_sections *elf_tag = (struct multiboot_tag_elf_sections *)tag;
                     
@@ -195,6 +216,7 @@ void multiboot2_parse() {
                 break;
                 
             case MULTIBOOT_TAG_TYPE_APM:
+                currentOutputStream->printf("Multiboot2: APM tag found\n");
                 if (!mb2_apm) {
                     /* Fixed size structure, simple copy */
                     memcpy(&mb2_apm_copy, tag, sizeof(struct multiboot_tag_apm));
@@ -203,6 +225,7 @@ void multiboot2_parse() {
                 break;
                 
             case MULTIBOOT_TAG_TYPE_EFI32:
+                currentOutputStream->printf("Multiboot2: EFI32 tag found\n");
                 if (!mb2_efi32) {
                     /* Fixed size structure, simple copy */
                     memcpy(&mb2_efi32_copy, tag, sizeof(struct multiboot_tag_efi32));
@@ -211,6 +234,7 @@ void multiboot2_parse() {
                 break;
                 
             case MULTIBOOT_TAG_TYPE_EFI64:
+                currentOutputStream->printf("Multiboot2: EFI64 tag found\n");
                 if (!mb2_efi64) {
                     /* Fixed size structure, simple copy */
                     memcpy(&mb2_efi64_copy, tag, sizeof(struct multiboot_tag_efi64));
@@ -219,6 +243,7 @@ void multiboot2_parse() {
                 break;
                 
             case MULTIBOOT_TAG_TYPE_SMBIOS:
+                currentOutputStream->printf("Multiboot2: SMBIOS tag found\n");
                 if (!mb2_smbios) {
                     struct multiboot_tag_smbios *smbios_tag = (struct multiboot_tag_smbios *)tag;
                     
@@ -238,6 +263,7 @@ void multiboot2_parse() {
                 break;
                 
             case MULTIBOOT_TAG_TYPE_ACPI_OLD:
+                currentOutputStream->printf("Multiboot2: Old ACPI tag found\n");
                 if (!mb2_acpi_old) {
                     struct multiboot_tag_old_acpi *acpi_tag = (struct multiboot_tag_old_acpi *)tag;
                     
@@ -257,6 +283,7 @@ void multiboot2_parse() {
                 break;
                 
             case MULTIBOOT_TAG_TYPE_ACPI_NEW:
+                currentOutputStream->printf("Multiboot2: New ACPI tag found\n");
                 if (!mb2_acpi_new) {
                     struct multiboot_tag_new_acpi *acpi_tag = (struct multiboot_tag_new_acpi *)tag;
                     
@@ -276,6 +303,7 @@ void multiboot2_parse() {
                 break;
                 
             case MULTIBOOT_TAG_TYPE_NETWORK:
+                currentOutputStream->printf("Multiboot2: Network tag found\n");
                 if (!mb2_network) {
                     struct multiboot_tag_network *net_tag = (struct multiboot_tag_network *)tag;
                     
@@ -295,6 +323,7 @@ void multiboot2_parse() {
                 break;
                 
             case MULTIBOOT_TAG_TYPE_EFI_MMAP:
+                currentOutputStream->printf("Multiboot2: EFI memory map tag found\n");
                 if (!mb2_efi_mmap) {
                     struct multiboot_tag_efi_mmap *efi_mmap_tag = (struct multiboot_tag_efi_mmap *)tag;
                     
@@ -314,10 +343,12 @@ void multiboot2_parse() {
                 break;
                 
             case MULTIBOOT_TAG_TYPE_EFI_BS:
+                currentOutputStream->printf("Multiboot2: EFI boot services tag found\n");
                 /* EFI boot services - typically not needed after boot */
                 break;
                 
             case MULTIBOOT_TAG_TYPE_EFI32_IH:
+                currentOutputStream->printf("Multiboot2: EFI32 image handle tag found\n");
                 if (!mb2_efi32_ih) {
                     /* Fixed size structure, simple copy */
                     memcpy(&mb2_efi32_ih_copy, tag, sizeof(struct multiboot_tag_efi32_ih));
@@ -326,6 +357,7 @@ void multiboot2_parse() {
                 break;
                 
             case MULTIBOOT_TAG_TYPE_EFI64_IH:
+                currentOutputStream->printf("Multiboot2: EFI64 image handle tag found\n");
                 if (!mb2_efi64_ih) {
                     /* Fixed size structure, simple copy */
                     memcpy(&mb2_efi64_ih_copy, tag, sizeof(struct multiboot_tag_efi64_ih));
@@ -334,6 +366,7 @@ void multiboot2_parse() {
                 break;
                 
             case MULTIBOOT_TAG_TYPE_LOAD_BASE_ADDR:
+                currentOutputStream->printf("Multiboot2: Load base address tag found\n");
                 if (!mb2_load_base_addr) {
                     /* Fixed size structure, simple copy */
                     memcpy(&mb2_load_base_addr_copy, tag, sizeof(struct multiboot_tag_load_base_addr));
@@ -343,6 +376,7 @@ void multiboot2_parse() {
                 
             default:
                 /* Unknown tag, skip */
+                currentOutputStream->printf("Multiboot2: Unknown tag type %u found\n", tag->type);
                 break;
         }
         
@@ -352,8 +386,6 @@ void multiboot2_parse() {
 
     if (
         mb2_framebuffer == NULL ||
-        mb2_mmap == NULL ||
-        mb2_basic_meminfo == NULL ||
         mb2_cmdline == NULL
     ) {
 
@@ -487,6 +519,15 @@ struct multiboot_tag_framebuffer* multiboot2_get_framebuffer(void) {
 
 int multiboot2_has_framebuffer(void) {
     return (mb2_framebuffer != NULL);
+}
+
+// VBE functions
+struct multiboot_tag_vbe* multiboot2_get_vbe(void) {
+    return mb2_vbe;
+}
+
+int multiboot2_has_vbe(void) {
+    return (mb2_vbe != NULL);
 }
 
 // Ek yardımcı fonksiyonlar

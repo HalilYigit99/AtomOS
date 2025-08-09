@@ -27,6 +27,14 @@ void intel86_idt_set_entry(size_t index, uint32_t base, uint16_t selector, uint8
     intel86_idt[index].type_attr = type_attr;
 }
 
+uint32_t intel86_idt_get_isr(size_t index) {
+    if (index >= IDT_SIZE) {
+        return 0; // Index out of bounds
+    }
+
+    return (intel86_idt[index].offset_high << 16) | intel86_idt[index].offset_low;
+}
+
 void intel86_idt_init(void) {
     // Initialize the IDT entries
     for (size_t i = 0; i < IDT_SIZE; i++) {

@@ -1,4 +1,5 @@
 #include <intel86.h>
+#include <hal/irqController.h>
 #include <stream/OutputStream.h>
 #include <list.h>
 
@@ -16,7 +17,7 @@ uint32_t uptime_ms = 0;
 void intel86_pit_init() {
 
     // Mask PIT interrupts
-    pic_mask(0);
+    irq_controller->disable_irq(0);
     
     // Komut portuna: kanal 0, erişim low+high, mod 2 (rate generator), binary mode
     outb(PIT_COMMAND_PORT, 0x36);  // 00 11 011 0
@@ -29,10 +30,10 @@ void intel86_pit_init() {
     currentOutputStream->printf("Initializing PIT with divisor %u for 1000Hz...\n", divisor);
 
     // Set up IDT entry for PIT (IRQ0 -> Interrupt 0x20)
-    intel86_idt_set_entry(0x20, (uint32_t)pit_isr_handler, 0x08, 0x8E);
+    irq_controller->set_irq_handler(0, pit_isr_handler);
 
     // Unmask IRQ0 in the PIC to enable PIT interrupts
-    pic_unmask(0);
+    irq_controller->enable_irq(0);
     
     currentOutputStream->printf("PIT initialized successfully!\n");
 }

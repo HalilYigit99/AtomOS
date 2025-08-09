@@ -10,11 +10,10 @@ extern "C" {
 #include <io.h>
 
 void intel86_idt_set_entry(size_t index, uint32_t base, uint16_t selector, uint8_t type_attr);
+uint32_t intel86_idt_get_isr(size_t index);
 
 void pic_mask(unsigned char id);
 void pic_unmask(unsigned char id);
-
-
 
 #ifdef __cplusplus
 }

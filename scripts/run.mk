@@ -1,7 +1,7 @@
 # Çalıştırma ve test kuralları
 
 # QEMU ayarları
-QEMU_FLAGS = -m 512M -serial stdio -vga std -no-reboot -no-shutdown
+QEMU_FLAGS = -m 512M -serial stdio
 QEMU_DEBUG_FLAGS = -s -S
 OVMF_PATH = /usr/share/ovmf/OVMF.fd
 

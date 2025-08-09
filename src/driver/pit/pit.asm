@@ -12,9 +12,8 @@ pit_isr_handler:
     call pit_interrupt_handler
 
     mov al, 0x20
-    out 0xa0, al    ; slave PIC (IRQ12 buradan gelir)
-    out 0x20, al    ; master PIC (slave'den geleni devre dışı bırakmak için)
-
+    out 0xA0, al    ; Slave PIC EOI
+    out 0x20, al    ; Master PIC EOI
 
     popad
     sti ; Re-enable interrupts

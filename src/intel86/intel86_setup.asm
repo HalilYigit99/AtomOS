@@ -29,8 +29,4 @@ intel86_setup_next:
 
     call intel86_paging_init  ; Initialize paging
 
-    call intel86_pic_init  ; Initialize the Programmable Interrupt Controller (PIC)
-
-    call intel86_pit_init  ; Initialize the Programmable Interval Timer (PIT)
-
     ret

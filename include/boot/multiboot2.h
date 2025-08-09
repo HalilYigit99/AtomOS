@@ -120,6 +120,18 @@ struct multiboot_tag_mmap {
     struct multiboot_mmap_entry entries[0];
 };
 
+/* VBE info */
+struct multiboot_tag_vbe {
+    uint32_t type;
+    uint32_t size;
+    uint16_t vbe_mode;
+    uint16_t vbe_interface_seg;
+    uint16_t vbe_interface_off;
+    uint16_t vbe_interface_len;
+    uint8_t vbe_control_info[512];
+    uint8_t vbe_mode_info[256];
+};
+
 /* Framebuffer info */
 struct multiboot_tag_framebuffer {
     uint32_t type;
@@ -256,6 +268,7 @@ extern struct multiboot_tag_module *mb2_module;
 extern struct multiboot_tag_basic_meminfo *mb2_basic_meminfo;
 extern struct multiboot_tag_bootdev *mb2_bootdev;
 extern struct multiboot_tag_mmap *mb2_mmap;
+extern struct multiboot_tag_vbe *mb2_vbe;
 extern struct multiboot_tag_framebuffer *mb2_framebuffer;
 extern struct multiboot_tag_elf_sections *mb2_elf_sections;
 extern struct multiboot_tag_apm *mb2_apm;
@@ -293,6 +306,10 @@ int multiboot2_efi_memory_map_iterate(void (*callback)(uint64_t addr, uint64_t l
 /* Framebuffer functions */
 struct multiboot_tag_framebuffer* multiboot2_get_framebuffer(void);
 int multiboot2_has_framebuffer(void);
+
+/* VBE functions */
+struct multiboot_tag_vbe* multiboot2_get_vbe(void);
+int multiboot2_has_vbe(void);
 
 /* Additional getter functions */
 struct multiboot_tag_module* multiboot2_get_module(void);

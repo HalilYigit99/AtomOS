@@ -12,14 +12,23 @@
 
 extern char __kernel_end; // End of kernel binary
 
-extern Driver ps2mouse_driver;
+extern Driver ps2kbd_driver; // PS/2 keyboard driver
+extern Driver ps2mouse_driver; // PS/2 mouse driver
+extern Driver pic8259_driver; // PIC8259 driver
+
 
 void __kernelHeap_setup();
 void gfx_init();
 void acpi_init();
+void intel86_setup();
+
+void intel86_pit_init();
 
 void __kernel_setup()
 {
+
+    intel86_setup();
+
     // Initialize output stream
     currentOutputStream->Open();
 
@@ -35,6 +44,11 @@ void __kernel_setup()
 
     currentOutputStream->printf("Kernel heap setup completed.\n");
 
+    // Initialize ACPI subsystem
+    // acpi_init();
+
+    currentOutputStream->printf("ACPI subsystem initialized.\n");
+
     // Setup gfx subsystem
     gfx_init();
 
@@ -43,21 +57,21 @@ void __kernel_setup()
     // Initialize PCI subsystem
     pci_init();
 
-    // Register PS/2 mouse driver
-    sys_driver_register(&ps2mouse_driver);
-
-    // Register PS/2 keyboard driver
+    // Initialize PS/2 keyboard driver
     sys_driver_register(&ps2kbd_driver);
+
+    // // Register PS/2 keyboard driver
+    // sys_driver_register(&ps2kbd_driver);
+
+    // // Register PS/2 mouse driver
+    // sys_driver_register(&ps2mouse_driver);
+
+    intel86_pit_init();
 
 }
 
 void __kernelHeap_setup()
 {
-    // Check if memory map is available
-    if (!mb2_mmap) {
-        // No memory map available, cannot setup heap
-        asm volatile("cli; hlt"); // Halt the system
-    }
 
     size_t kernelEnd = (size_t)&__kernel_end;
     
