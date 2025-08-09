@@ -10,6 +10,8 @@
 #include <keyboard/Keyboard.h>
 #include <graphics/gfx.h>
 
+extern int main(int argc, char** argv);
+
 extern char __kernel_end; // End of kernel binary
 
 extern Driver ps2kbd_driver; // PS/2 keyboard driver
@@ -58,15 +60,26 @@ void __kernel_setup()
     pci_init();
 
     // Initialize PS/2 keyboard driver
+    sys_driver_register(&pic8259_driver);
+
+    // Register PS/2 keyboard driver
     sys_driver_register(&ps2kbd_driver);
 
-    // // Register PS/2 keyboard driver
-    // sys_driver_register(&ps2kbd_driver);
-
-    // // Register PS/2 mouse driver
-    // sys_driver_register(&ps2mouse_driver);
+    // Register PS/2 mouse driver
+    sys_driver_register(&ps2mouse_driver);
 
     intel86_pit_init();
+
+    asm volatile ("sti"); // Enable interrupts
+
+    main(0,0);
+
+    while (1) {
+        // Main loop
+        // Here you can add code to handle events, etc.
+        // For now, we just halt the CPU to save power
+        asm volatile ("hlt");
+    }
 
 }
 

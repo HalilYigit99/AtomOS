@@ -39,6 +39,7 @@ void intel86_pit_init() {
 }
 
 void pit_interrupt_handler() {
+
     // Increment uptime counter
     uptime_ms++;
 

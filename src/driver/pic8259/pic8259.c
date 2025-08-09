@@ -2,6 +2,7 @@
 #include <hal/irqController.h>
 #include <intel86.h>
 #include <io.h>
+#include <print.h>
 
 #define PIC1_COMMAND 0x20
 #define PIC1_DATA    0x21
@@ -160,6 +161,9 @@ void pic8259_set_vector(uint8_t irq, uint8_t vector)
 extern uint32_t irq2_isr_address;
 
 void __attribute__((naked)) irq2_handler() {
+
+    kprintf("IRQ2 handler called\n");
+
     irq2_isr_address = (uint32_t)irq_default_handler;
 
     // Slave pic e sor hangi IRQ geldi

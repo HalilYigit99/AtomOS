@@ -27,6 +27,6 @@ intel86_setup_next:
 
     call intel86_idt_init  ; Initialize the Interrupt Descriptor Table (IDT)
 
-    call intel86_paging_init  ; Initialize paging
+    ; call intel86_paging_init  ; Initialize paging
 
     ret
